@@ -1,5 +1,6 @@
+[English](#english) | [中文](#中文)
+
 <a id="english"></a>
-English | [简体中文](#chinese)
 
 # 🚌 CatBus
 
@@ -405,8 +406,7 @@ MIT — see [LICENSE](./LICENSE).
 
 ---
 
-<a id="chinese"></a>
-[English](#english) | 简体中文
+<a id="中文"></a>
 
 # 🚌 CatBus
 
