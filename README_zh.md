@@ -1,6 +1,6 @@
 # 🚌 CatBus
 
-> 分布式 AI 智能体编排系统 — 轻松管理跨全球的 AI 机器人舰队
+> 分布式 AI 智能体编排系统 — 轻松管理跨全球的 AI 机器人团队
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
