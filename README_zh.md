@@ -1,66 +1,167 @@
 # 🚌 CatBus
 
-> 分布式 AI 智能体编排系统 — 轻松管理跨全球的 AI 机器人团队
+> 你的 AI 机器人，不应该被困在一台机器里。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 [![Zenoh](https://img.shields.io/badge/networking-Zenoh-orange.svg)](https://zenoh.io/)
 [![GitHub Stars](https://img.shields.io/github/stars/xiaogong2000/catbus?style=social)](https://github.com/xiaogong2000/catbus)
 
-**CatBus** 是一个开源的分布式 AI 智能体编排框架。基于 [Zenoh P2P](https://zenoh.io/) 网络构建，你可以将任务提交到舰队中的任意节点并异步追踪结果 —— 无需中心 Broker，无单点故障。
+**CatBus** 是一个开源工具，让运行在不同物理机器上的 AI 机器人互相发现、通信和协作 — 无需中心服务器，无需属于同一个主人。
+
+市面上的多智能体框架（CrewAI、AutoGen、LangGraph）把所有 agent 跑在同一个进程、同一台机器里。但现实世界不是这样的 — 你的 agent 散布在不同机器、不同城市、甚至属于不同的人。**CatBus 让它们连接起来。**
 
 **English Docs** → [README.md](./README.md)
 
 ---
 
-## ✨ 核心特性
+## 30 秒看懂 CatBus
 
-- **🌐 真正的 P2P 网络** — 基于 Zenoh，节点之间无需中心 Broker 即可互相发现
-- **⚡ 异步任务执行** — 提交任务立即返回 `task_id`，结果就绪后自动推送
-- **🧠 三层状态树** — `Desired / Actual / Drift` 三层结构让每个节点的状态一目了然
-- **📡 拉取式任务分发** — 节点在有空闲时主动认领任务，不会被推送压垮
-- **💰 成本追踪** — 内置 API 费用监控，覆盖整个舰队
-- **🌍 多地域部署** — 经过 OVH 法国、洛杉矶 VPS 与家庭节点同时运行的真实验证
-- **🤖 兼容 OpenClaw** — 开箱即用地编排 [OpenClaw](https://github.com/openclaw) AI 智能体
+**没有 CatBus** — 你的机器人各自孤立：
+
+```
+  机器 A                 机器 B                 机器 C
+  ┌──────────┐          ┌──────────┐          ┌──────────┐
+  │ Agent 🤖 │          │ Agent 🤖 │          │ Agent 🤖 │
+  │          │          │          │          │          │
+  │ （孤岛）  │          │ （孤岛）  │          │ （孤岛）  │
+  └──────────┘          └──────────┘          └──────────┘
+       ✗ 互相看不见，无法协作
+```
+
+**有了 CatBus** — 它们自动发现彼此，协同工作：
+
+```
+  机器 A                 机器 B                 机器 C
+  ┌──────────┐          ┌──────────┐          ┌──────────┐
+  │ Agent 🤖 │◄────────►│ Agent 🤖 │◄────────►│ Agent 🤖 │
+  │          │          │          │          │          │
+  │ CatBus 🚌│          │ CatBus 🚌│          │ CatBus 🚌│
+  └──────────┘          └──────────┘          └──────────┘
+       ✓ 发现 · 通信 · 协作
+```
+
+不需要中心服务器。不依赖云。机器人直接对话。
 
 ---
 
-## 🏗️ 架构设计
+## 为什么选 CatBus？
 
-```
-                        ┌─────────────────────────┐
-                        │      CatBus 网络层        │
-                        │    (Zenoh P2P Fabric)    │
-                        └────────────┬────────────┘
-                                     │
-          ┌──────────────────────────┼──────────────────────────┐
-          │                          │                          │
-    ┌─────▼──────┐            ┌──────▼─────┐            ┌──────▼─────┐
-    │  节点: Nefi │            │  节点: 狗子  │            │  节点: 咪咪  │
-    │  (主节点)   │            │  (OVH 法国) │            │  (洛杉矶)   │
-    │             │            │            │            │            │
-    │ ┌─────────┐ │            │ ┌────────┐ │            │ ┌────────┐ │
-    │ │Desired  │ │            │ │Desired │ │            │ │Desired │ │
-    │ │Actual   │ │            │ │Actual  │ │            │ │Actual  │ │
-    │ │Drift    │ │            │ │Drift   │ │            │ │Drift   │ │
-    │ └─────────┘ │            │ └────────┘ │            │ └────────┘ │
-    └─────────────┘            └────────────┘            └────────────┘
-```
+别的多智能体框架把所有 agent 跑在同一个进程里。CatBus 不一样：
 
-每个节点维护自己的**三层状态树**：
-- **Desired**（期望状态） — 节点应该在做什么
-- **Actual**（实际状态） — 节点现在实际在做什么
-- **Drift**（偏差）— 两者之间的差异（触发告警）
+|  | CrewAI / AutoGen / LangGraph | CatBus |
+|---|---|---|
+| agent 在哪里 | 同一进程、同一台机器 | **不同机器、不同地域** |
+| 怎么连接 | 代码内的函数调用 | **P2P 网络，无需云服务器** |
+| 谁来控制 | 一个中心编排脚本 | **每个机器人自治** |
+| 适合什么 | 开发时的 agent 流水线 | **生产环境的多机器人部署** |
 
 ---
 
-## 🚀 快速开始
+## 核心能力
+
+### 🔍 发现
+
+机器人加入网络后自动互相发现。不需要注册中心，不需要手动配置。
+
+```python
+from catbus import CatBusNode
+
+# 启动节点 — 立即发现网络上的其他机器人
+node = CatBusNode(name="my-robot", capabilities=["seo", "translation"])
+node.start()
+
+# 看看网络上有谁
+peers = node.discover()
+# → [{"name": "alice-bot", "capabilities": ["writing", "research"]},
+#    {"name": "bob-bot",  "capabilities": ["coding", "testing"]}]
+```
+
+### 💬 通信
+
+机器人之间互相发消息 — 请求、响应、事件、状态更新。
+
+```python
+# 向指定机器人发送请求
+response = node.ask("alice-bot", {
+    "type": "request",
+    "task": "把这段话翻译成法语",
+    "payload": {"text": "Hello world"}
+})
+
+# 或者广播给任何有能力处理的机器人
+response = node.ask("any", {
+    "type": "request",
+    "capability": "translation",
+    "payload": {"text": "Hello world", "target_lang": "fr"}
+})
+```
+
+### 🤝 协作
+
+机器人之间互相委托任务，协同完成复杂工作流。
+
+```python
+# 提交任务 — 立即返回，在最合适的节点上异步执行
+task_id = node.submit(
+    target="any",
+    task_type="seo_analysis",
+    payload={"url": "https://example.com"}
+)
+
+# 任务在网络中流转：
+#   PENDING → CLAIMED（被合适的节点认领）→ RUNNING → DONE
+result = node.wait(task_id, timeout=120)
+```
+
+---
+
+## 架构设计
+
+CatBus 由四层构成，每层职责清晰：
+
+```
+┌──────────────────────────────────────────────────────┐
+│  协作层 Collaboration                                 │
+│  任务委托 · 工作流编排 · 费用均衡                       │
+├──────────────────────────────────────────────────────┤
+│  通信层 Communication                                 │
+│  请求/响应 · 发布/订阅 · 事件通知                       │
+├──────────────────────────────────────────────────────┤
+│  发现层 Discovery                                     │
+│  节点发现 · 能力声明 · 身份标识                         │
+├──────────────────────────────────────────────────────┤
+│  传输层 Transport (Zenoh P2P)                         │
+│  物理连接 · NAT 穿透 · Gossip 路由                     │
+└──────────────────────────────────────────────────────┘
+```
+
+**为什么用 Zenoh？** CatBus 的传输层基于 [Zenoh](https://zenoh.io/) — 一个 P2P 协议，能自动处理节点发现、消息路由和 NAT 穿透，无需中心 Broker。这意味着你的机器人可以跨家庭网络、VPS 和数据中心直接通信，不需要额外基础设施。
+
+### 状态模型：Desired / Actual / Drift
+
+每个机器人维护一棵三层状态树：
+
+```
+┌──────────────────┐
+│  Desired 期望状态  │ ← 机器人应该在做什么
+├──────────────────┤
+│  Actual 实际状态   │ ← 它现在实际在做什么
+├──────────────────┤
+│  Drift 偏差       │ ← 两者的差距（差距过大时触发告警）
+└──────────────────┘
+```
+
+这让你一眼就能看清整个机器人舰队的状态 — 哪些偏离了预期行为，立刻可见。
+
+---
+
+## 快速开始
 
 ### 环境要求
 
 - Python 3.10+
 - 安装 [Zenoh](https://zenoh.io/docs/getting-started/installation/)
-- 至少配置一个 [OpenClaw](https://github.com/openclaw) 智能体
 
 ### 安装
 
@@ -76,195 +177,200 @@ cd catbus
 pip install -e .
 ```
 
-### 配置
+### 配置你的机器人
 
 ```bash
 cp config.example.yaml config.yaml
-# 编辑 config.yaml，填入节点名称、Zenoh 端点和智能体配置
 ```
-
-最小化 `config.yaml` 示例：
 
 ```yaml
 node:
-  name: "my-node"           # 节点唯一名称
-  location: "cn-beijing"    # 节点位置标签
+  name: "my-robot"          # 机器人在网络中的名字
+  location: "cn-beijing"    # 它在哪里
+  capabilities:             # 它能做什么
+    - seo_analysis
+    - content_writing
 
 zenoh:
-  mode: peer                # peer | client | router
+  mode: peer
   endpoints:
     - "tcp/0.0.0.0:7447"
 
 agent:
-  provider: openai          # AI 提供商
+  provider: openai
   model: gpt-4o
-
-catbus:
-  task_timeout: 300         # 超时时间（秒）
-  max_concurrent_tasks: 3   # 最大并发任务数
 ```
 
-### 启动节点
+### 加入网络
 
 ```bash
 catbus start
 ```
 
-### 提交任务
+你的机器人现在可以被网络上任何能到达它的 CatBus 节点发现了。就这么简单。
 
-```python
-from catbus import CatBusClient
+### 连接第二个机器人
 
-client = CatBusClient()
+在另一台机器上安装 CatBus，指向第一个节点，启动：
 
-# 提交任务 — 立即返回 task_id，不阻塞
-task_id = client.submit(
-    target="any",               # "any" 或指定节点名称
-    task_type="seo_analysis",
-    payload={"url": "https://example.com"}
-)
+```yaml
+# 机器 B 上的 config.yaml
+node:
+  name: "helper-bot"
+  capabilities: ["research", "coding"]
 
-print(f"任务已提交: {task_id}")
-
-# 等待结果（或使用回调/webhook）
-result = client.wait(task_id, timeout=120)
-print(result)
+zenoh:
+  mode: peer
+  connect:
+    - "tcp/机器A的IP:7447"    # 只需要能连到一个节点
 ```
+
+```bash
+catbus start
+```
+
+两个机器人现在可以互相发现、交换消息、委托任务。
 
 ---
 
-## 📡 任务生命周期
+## 真实验证
 
-```
-submit()                      节点认领任务
-   │                              │
-   ▼                              ▼
-task_id ──────────────► PENDING ──► CLAIMED ──► RUNNING ──► DONE
-立即返回                                                       │
-                                                         结果存入
-                                                         Zenoh KV
-```
+CatBus 不是原型 — 它 7×24 运行着一个跨三大洲的 5 节点舰队：
 
-CatBus 是**完全异步**的 —— 提交任务永远不会阻塞。节点在有空闲时拉取任务并执行，结果发布回 Zenoh 网络。
+| 机器人 | 位置 | 能力 |
+|-------|------|------|
+| Nefi    | 家庭（主节点） | 编排、SEO |
+| 狗子    | OVH 法国 | 通用任务 |
+| 咪咪    | 洛杉矶 | 内容生成 |
+| 浣浣    | 家庭 | 监控 |
+| *(更多)* | 各地 | 各类任务 |
+
+舰队每天处理数百个任务。当某个节点过载时，任务自动流向有空闲的节点。API 费用在全网络自动追踪和均衡。
 
 ---
 
-## 🖥️ 监控面板
-
-CatBus 内置监控面板：
+## 监控面板
 
 ```bash
 catbus dashboard --port 8080
 ```
 
-访问 `http://localhost:8080` 可查看：
-- 舰队各节点实时状态
-- 每个节点的任务队列深度
-- API 费用明细（按节点、按天）
+内置面板可查看：
+- 哪些机器人在线、在做什么
+- 任务在网络中的流转情况
+- 每个机器人的 API 费用明细（按天）
 - 通过 Zenoh pub/sub 汇总的 24 小时健康报告
 
 ---
 
-## 🌐 多节点部署
+## 多节点部署
 
-CatBus 专为地理分布式部署设计，每个节点只需能连接到至少一个对等节点：
+每个节点只需要能连到至少一个 peer，Zenoh 的 Gossip 协议会处理剩下的事：
 
 ```yaml
-# 法国 OVH 节点
+# 法国的机器人
 zenoh:
-  mode: peer
   connect:
-    - "tcp/your-home-node-ip:7447"
+    - "tcp/home-node:7447"
 
-# 洛杉矶节点
+# 洛杉矶的机器人
 zenoh:
-  mode: peer
   connect:
-    - "tcp/your-home-node-ip:7447"
-    - "tcp/france-node-ip:7447"
+    - "tcp/home-node:7447"
+    - "tcp/france-node:7447"
 ```
 
-节点通过 Zenoh 的 Gossip 协议自动互相发现，无需手动配置路由表。
+不需要路由表。不需要服务发现基础设施。节点自动互相发现。
 
 ---
 
-## 📊 真实使用案例
-
-CatBus 驱动着一个 5 节点全球舰队，每天运行 SEO 分析工作流：
-
-| 节点 | 位置 | 角色 |
-|------|------|------|
-| Nefi | 家庭 | 主节点 / 编排器 |
-| 狗子 | OVH 法国 | 工作节点 |
-| 咪咪 | 洛杉矶 | 工作节点 |
-| 浣浣 | 家庭 | 工作节点 |
-| *(更多)* | 各地 | 工作节点 |
-
-系统每天处理数百个任务，并在各节点间自动均衡 API 费用。
-
----
-
-## 📁 项目结构
+## 项目结构
 
 ```
 catbus/
 ├── catbus/
 │   ├── core/
-│   │   ├── node.py              # 节点生命周期管理
+│   │   ├── node.py              # 机器人生命周期与身份
 │   │   ├── task.py              # 任务提交与追踪
-│   │   └── state.py             # 三层状态树（Desired/Actual/Drift）
+│   │   └── state.py             # Desired / Actual / Drift 状态树
 │   ├── transport/
-│   │   └── zenoh_transport.py   # Zenoh P2P 通信层
+│   │   └── zenoh_transport.py   # Zenoh P2P 通信
+│   ├── discovery/
+│   │   └── capabilities.py      # 能力声明与匹配
 │   ├── agents/
 │   │   └── openclaw.py          # OpenClaw 智能体集成
 │   └── dashboard/               # 监控 Web UI
 ├── examples/
-│   ├── single_node/             # 单节点入门示例
-│   ├── multi_node/              # 分布式部署示例
-│   └── seo_workflow/            # 真实 SEO 工作流示例
+│   ├── two_robots/              # 最小双机器人示例
+│   ├── team_fleet/              # 团队部署（5+ 节点）
+│   └── seo_workflow/            # 真实 SEO 工作流
 ├── config.example.yaml
-├── docker-compose.example.yml
 └── docs/
 ```
 
 ---
 
-## 🐳 Docker 部署
+## Docker 部署
 
 ```bash
-# 单节点快速启动
 docker-compose -f docker-compose.example.yml up
+```
 
-# 或自行构建
+或自行构建：
+
+```bash
 docker build -t catbus .
 docker run -v $(pwd)/config.yaml:/app/config.yaml catbus
 ```
 
 ---
 
-## 🛠️ 配置项参考
+## 配置项参考
 
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
-| `node.name` | *(必填)* | 节点唯一标识符 |
+| `node.name` | *(必填)* | 机器人在网络中的身份 |
+| `node.capabilities` | `[]` | 机器人能做什么 |
 | `zenoh.mode` | `peer` | Zenoh 会话模式 |
 | `zenoh.endpoints` | `[]` | 本地监听端点 |
-| `zenoh.connect` | `[]` | 要连接的远程对等节点 |
+| `zenoh.connect` | `[]` | 要连接的远程节点 |
 | `agent.provider` | `openai` | AI 提供商 |
-| `catbus.max_concurrent_tasks` | `3` | 每个节点最大并发任务数 |
+| `catbus.max_concurrent_tasks` | `3` | 最大并发任务数 |
 | `catbus.health_report_interval` | `3600` | 健康报告周期（秒） |
-| `catbus.telegram_token` | `""` | Telegram Bot Token（用于通知） |
+| `catbus.telegram_token` | `""` | Telegram 通知 |
 
 完整配置文档 → [docs/configuration.md](./docs/configuration.md)
 
 ---
 
-## 🤝 参与贡献
+## 开发计划
+
+**Phase 1 — 团队工具** *（当前阶段）*
+- [x] 基于 Zenoh 的 P2P 节点发现
+- [x] 异步任务提交与执行
+- [x] 三层状态树（Desired / Actual / Drift）
+- [x] 拉取式任务分发与认领机制
+- [x] 全舰队费用追踪
+- [ ] 基于能力的任务路由
+- [ ] 健康数据 Schema 版本管理
+- [ ] Provider 故障转移优化
+- [ ] Web 任务提交界面
+
+**Phase 2 — 开放网络** *（未来）*
+- [ ] 公开能力注册表
+- [ ] 跨团队机器人协作
+- [ ] 信任与权限模型
+- [ ] 机器人能力市场
+
+> **我们的方向：** 今天，CatBus 让你团队内的机器人协作起来。未来，我们要构建一个开放网络 — 任何 AI 机器人都能发现并与其他机器人协作。一个 AI 机器人的互联网。
+
+---
+
+## 参与贡献
 
 欢迎贡献！请先阅读 [CONTRIBUTING.md](./CONTRIBUTING.md)。
 
 ```bash
-# 开发环境搭建
 git clone https://github.com/xiaogong2000/catbus.git
 cd catbus
 pip install -e ".[dev]"
@@ -273,32 +379,22 @@ pre-commit install
 
 特别欢迎以下方面的贡献：
 - 更多智能体集成（OpenClaw 之外的框架）
-- 更多工作流示例
+- 工作流示例
 - 文档改进
 - Windows / ARM 平台测试
 
 ---
 
-## 📋 开发计划
-
-- [ ] 智能体能力匹配（自动将任务路由到有对应能力的节点）
-- [ ] 健康数据的 Schema 版本管理
-- [ ] 改进 Provider 故障转移逻辑
-- [ ] 基于 Web 的任务提交界面
-- [ ] 市场模式 / "AI 机器人 Uber" 模式
-
----
-
-## 📄 开源协议
+## 开源协议
 
 MIT License — 详见 [LICENSE](./LICENSE)
 
 ---
 
-## 🙏 致谢
+## 致谢
 
 - [Zenoh](https://zenoh.io/) — 让一切成为可能的 P2P 网络层
-- [OpenClaw](https://github.com/openclaw) — 驱动团队的 AI 智能体框架
+- [OpenClaw](https://github.com/openclaw) — 驱动舰队的 AI 智能体框架
 
 ---
 
