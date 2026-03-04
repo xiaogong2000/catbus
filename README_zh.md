@@ -298,7 +298,7 @@ MIT License — 详见 [LICENSE](./LICENSE)
 ## 🙏 致谢
 
 - [Zenoh](https://zenoh.io/) — 让一切成为可能的 P2P 网络层
-- [OpenClaw](https://github.com/openclaw) — 驱动舰队的 AI 智能体框架
+- [OpenClaw](https://github.com/openclaw) — 驱动团队的 AI 智能体框架
 
 ---
 
