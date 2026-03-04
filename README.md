@@ -1,74 +1,175 @@
 # 🚌 CatBus
 
-> Distributed AI Agent Orchestration System — Run your AI fleet across the globe, effortlessly.
+> Your AI robots shouldn't be trapped on one machine.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 [![Zenoh](https://img.shields.io/badge/networking-Zenoh-orange.svg)](https://zenoh.io/)
 [![GitHub Stars](https://img.shields.io/github/stars/xiaogong2000/catbus?style=social)](https://github.com/xiaogong2000/catbus)
 
-**CatBus** is an open-source framework for orchestrating multiple AI agents across distributed nodes. Built on [Zenoh P2P](https://zenoh.io/) networking, it lets you submit tasks to any node in your fleet and track them asynchronously — no central broker, no single point of failure.
+**CatBus** is an open-source tool that lets AI robots running on different physical machines discover each other, communicate, and collaborate — no central server, no single owner required.
 
-**Chinese Docs** → [README_zh.md](./README_zh.md)
+Most multi-agent frameworks (CrewAI, AutoGen, LangGraph) run all agents inside one process on one machine. That's not how the real world works. Your agents live on different machines, in different cities, owned by different people. **CatBus connects them.**
 
----
-
-## ✨ Key Features
-
-- **🌐 True P2P Networking** — Powered by Zenoh, nodes discover each other without a central broker
-- **⚡ Async Task Execution** — Submit a task and get a `task_id` immediately; results arrive when ready
-- **🧠 Three-Layer State Tree** — `Desired / Actual / Drift` gives you full visibility into every node's state
-- **📡 Pull-Based Distribution** — Nodes claim tasks when they have capacity; no push overload
-- **💰 Cost Tracking** — Built-in API cost monitoring across your entire fleet
-- **🌍 Multi-Geography** — Battle-tested across OVH France, Los Angeles VPS, and home nodes simultaneously
-- **🤖 OpenClaw Compatible** — Designed to orchestrate [OpenClaw](https://github.com/openclaw) AI agents out of the box
+**中文文档** → [README_zh.md](./README_zh.md)
 
 ---
 
-## 🏗️ Architecture
+## 30 Seconds to Understand CatBus
+
+**Without CatBus** — your robots are isolated:
 
 ```
-                        ┌─────────────────────────┐
-                        │      CatBus Network      │
-                        │    (Zenoh P2P Fabric)    │
-                        └────────────┬────────────┘
-                                     │
-          ┌──────────────────────────┼──────────────────────────┐
-          │                          │                          │
-    ┌─────▼──────┐            ┌──────▼─────┐            ┌──────▼─────┐
-    │  Node: Nefi │            │ Node: Gouzi │            │  Node: Mimi │
-    │  (Primary)  │            │  (OVH FR)  │            │  (LA VPS)  │
-    │             │            │            │            │            │
-    │ ┌─────────┐ │            │ ┌────────┐ │            │ ┌────────┐ │
-    │ │Desired  │ │            │ │Desired │ │            │ │Desired │ │
-    │ │Actual   │ │            │ │Actual  │ │            │ │Actual  │ │
-    │ │Drift    │ │            │ │Drift   │ │            │ │Drift   │ │
-    │ └─────────┘ │            │ └────────┘ │            │ └────────┘ │
-    └─────────────┘            └────────────┘            └────────────┘
+  Machine A              Machine B              Machine C
+  ┌──────────┐          ┌──────────┐          ┌──────────┐
+  │ Agent 🤖 │          │ Agent 🤖 │          │ Agent 🤖 │
+  │          │          │          │          │          │
+  │ (alone)  │          │ (alone)  │          │ (alone)  │
+  └──────────┘          └──────────┘          └──────────┘
+       ✗ Can't see each other. Can't work together.
 ```
 
-Each node maintains its own **three-layer state tree**:
-- **Desired** — what the node is supposed to be doing
-- **Actual** — what it's actually doing right now
-- **Drift** — divergence between the two (triggers alerts)
+**With CatBus** — they find each other and collaborate:
+
+```
+  Machine A              Machine B              Machine C
+  ┌──────────┐          ┌──────────┐          ┌──────────┐
+  │ Agent 🤖 │◄────────►│ Agent 🤖 │◄────────►│ Agent 🤖 │
+  │          │          │          │          │          │
+  │ CatBus 🚌│          │ CatBus 🚌│          │ CatBus 🚌│
+  └──────────┘          └──────────┘          └──────────┘
+       ✓ Discover. Communicate. Collaborate.
+```
+
+No central server. No cloud dependency. Just robots talking to robots.
 
 ---
 
-## 🚀 Quick Start
+## Why CatBus?
+
+Other multi-agent frameworks run all agents in the same process. CatBus is different:
+
+|  | CrewAI / AutoGen / LangGraph | CatBus |
+|---|---|---|
+| Where agents run | Same process, same machine | **Different machines, different locations** |
+| How they connect | Function calls in code | **P2P network, no cloud needed** |
+| Who controls them | A central orchestration script | **Each robot is autonomous** |
+| Best for | Dev-time agent pipelines | **Production multi-machine deployments** |
+
+---
+
+## Core Capabilities
+
+### 🔍 Discover
+
+Robots find each other automatically when they join the network. No registration server, no manual config.
+
+```python
+from catbus import CatBusNode
+
+# Start a node — it immediately discovers peers on the network
+node = CatBusNode(name="my-robot", capabilities=["seo", "translation"])
+node.start()
+
+# See who's out there
+peers = node.discover()
+# → [{"name": "alice-bot", "capabilities": ["writing", "research"]},
+#    {"name": "bob-bot",  "capabilities": ["coding", "testing"]}]
+```
+
+### 💬 Communicate
+
+Robots send messages to each other — requests, responses, events, status updates.
+
+```python
+# Send a message to a specific robot
+response = node.ask("alice-bot", {
+    "type": "request",
+    "task": "translate this paragraph to French",
+    "payload": {"text": "Hello world"}
+})
+
+# Or broadcast to anyone who can help
+response = node.ask("any", {
+    "type": "request",
+    "capability": "translation",
+    "payload": {"text": "Hello world", "target_lang": "fr"}
+})
+```
+
+### 🤝 Collaborate
+
+Robots delegate tasks to each other and work together on complex workflows.
+
+```python
+# Submit a task — returns immediately, executes on the best available node
+task_id = node.submit(
+    target="any",
+    task_type="seo_analysis",
+    payload={"url": "https://example.com"}
+)
+
+# The task flows through the network:
+#   PENDING → CLAIMED (by a capable node) → RUNNING → DONE
+result = node.wait(task_id, timeout=120)
+```
+
+---
+
+## Architecture
+
+CatBus is built as a four-layer stack. Each layer serves a clear purpose:
+
+```
+┌──────────────────────────────────────────────────────┐
+│  Collaboration Layer                                 │
+│  Task delegation · Workflows · Cost balancing        │
+├──────────────────────────────────────────────────────┤
+│  Communication Layer                                 │
+│  Request/Response · Pub/Sub · Event notification     │
+├──────────────────────────────────────────────────────┤
+│  Discovery Layer                                     │
+│  Peer discovery · Capability announcement · Identity │
+├──────────────────────────────────────────────────────┤
+│  Transport Layer (Zenoh P2P)                         │
+│  Physical connectivity · NAT traversal · Gossip      │
+└──────────────────────────────────────────────────────┘
+```
+
+**Why Zenoh?** CatBus uses [Zenoh](https://zenoh.io/) as its transport layer — a peer-to-peer protocol that handles node discovery, message routing, and NAT traversal without a central broker. This means your robots can connect across home networks, VPS providers, and data centers without any special infrastructure.
+
+### State Model: Desired / Actual / Drift
+
+Each robot maintains a three-layer state tree:
+
+```
+┌──────────────────┐
+│  Desired State   │ ← What the robot should be doing
+├──────────────────┤
+│  Actual State    │ ← What it's actually doing right now
+├──────────────────┤
+│  Drift           │ ← The gap (triggers alerts if too large)
+└──────────────────┘
+```
+
+This makes it easy to monitor a fleet of robots at a glance — you immediately see which ones have drifted from their expected behavior.
+
+---
+
+## Quick Start
 
 ### Prerequisites
 
 - Python 3.10+
 - [Zenoh](https://zenoh.io/docs/getting-started/installation/) installed
-- At least one [OpenClaw](https://github.com/openclaw) agent configured
 
-### Installation
+### Install
 
 ```bash
 pip install catbus-agent
 ```
 
-Or install from source:
+Or from source:
 
 ```bash
 git clone https://github.com/xiaogong2000/catbus.git
@@ -76,228 +177,223 @@ cd catbus
 pip install -e .
 ```
 
-### Configure
+### Configure Your Robot
 
 ```bash
 cp config.example.yaml config.yaml
-# Edit config.yaml with your node name, Zenoh endpoints, and agent settings
 ```
-
-Minimal `config.yaml`:
 
 ```yaml
 node:
-  name: "my-node"           # Unique name for this node
-  location: "us-west"       # Human-readable location label
+  name: "my-robot"          # Your robot's name on the network
+  location: "us-west"       # Where it lives
+  capabilities:             # What it can do
+    - seo_analysis
+    - content_writing
 
 zenoh:
-  mode: peer                # peer | client | router
+  mode: peer
   endpoints:
     - "tcp/0.0.0.0:7447"
 
 agent:
-  provider: openai          # Your AI provider
+  provider: openai
   model: gpt-4o
-
-catbus:
-  task_timeout: 300         # seconds
-  max_concurrent_tasks: 3
 ```
 
-### Start Your Node
+### Join the Network
 
 ```bash
 catbus start
 ```
 
-### Submit a Task
+Your robot is now discoverable by any other CatBus node it can reach. That's it.
 
-```python
-from catbus import CatBusClient
+### Connect a Second Robot
 
-client = CatBusClient()
+On another machine, install CatBus, point it at the first node, and start:
 
-# Submit a task — returns immediately with a task_id
-task_id = client.submit(
-    target="any",           # "any" | specific node name
-    task_type="seo_analysis",
-    payload={"url": "https://example.com"}
-)
+```yaml
+# config.yaml on Machine B
+node:
+  name: "helper-bot"
+  capabilities: ["research", "coding"]
 
-print(f"Task submitted: {task_id}")
-
-# Poll for result (or use webhook/callback)
-result = client.wait(task_id, timeout=120)
-print(result)
+zenoh:
+  mode: peer
+  connect:
+    - "tcp/machine-a-ip:7447"    # Just needs to reach one peer
 ```
+
+```bash
+catbus start
+```
+
+The two robots can now discover each other, exchange messages, and delegate tasks.
 
 ---
 
-## 📡 Task Lifecycle
+## Real-World Proof
 
-```
-submit()                    node claims task
-   │                              │
-   ▼                              ▼
-task_id ──────────────► PENDING ──► CLAIMED ──► RUNNING ──► DONE
-returned immediately                                          │
-                                                         result stored
-                                                         in Zenoh KV
-```
+CatBus isn't a prototype — it runs a 5-node fleet across three continents 24/7:
 
-CatBus is **fully asynchronous** — submitting a task never blocks. Nodes pull tasks when they have capacity, execute them, and publish results back to the Zenoh fabric.
+| Robot | Location | Capabilities |
+|-------|----------|-------------|
+| Nefi    | Home (Primary) | Orchestration, SEO |
+| Gouzi   | OVH France | General tasks |
+| Mimi    | Los Angeles | Content generation |
+| Huanhu  | Home | Monitoring |
+| *(+ more)* | Various | Various |
+
+The fleet processes hundreds of tasks daily. When one node is overloaded, tasks automatically flow to nodes with available capacity. API costs are tracked and balanced across the network.
 
 ---
 
-## 🖥️ Monitoring Dashboard
-
-CatBus ships with a built-in monitoring dashboard:
+## Monitoring
 
 ```bash
 catbus dashboard --port 8080
 ```
 
-View at `http://localhost:8080`:
-- Real-time node status across your fleet
-- Task queue depth per node
-- API cost breakdown (per node, per day)
-- 24-hour health aggregation via Zenoh pub/sub
+The built-in dashboard shows:
+- Which robots are online and what they're doing
+- Task flow across the network
+- API cost breakdown per robot, per day
+- 24-hour health reports aggregated via Zenoh pub/sub
 
 ---
 
-## 🌐 Multi-Node Deployment
+## Multi-Node Deployment
 
-CatBus is designed for geographically distributed deployments. Each node just needs to reach at least one peer:
+Every node just needs to reach at least one peer. Zenoh's gossip protocol handles the rest:
 
 ```yaml
-# Node in France (OVH)
+# Robot in France
 zenoh:
-  mode: peer
   connect:
-    - "tcp/your-home-node-ip:7447"
+    - "tcp/home-node:7447"
 
-# Node in Los Angeles
+# Robot in Los Angeles
 zenoh:
-  mode: peer
   connect:
-    - "tcp/your-home-node-ip:7447"
-    - "tcp/france-node-ip:7447"
+    - "tcp/home-node:7447"
+    - "tcp/france-node:7447"
 ```
 
-Nodes self-discover via Zenoh's gossip protocol. No manual routing tables needed.
+No routing tables. No service discovery infrastructure. Nodes find each other automatically.
 
 ---
 
-## 📊 Real-World Usage
-
-CatBus powers a 5-node global fleet running daily SEO analysis workflows:
-
-| Node | Location | Role |
-|------|----------|------|
-| Nefi   | Home | Primary / Orchestrator |
-| Gouzi  | OVH France | Worker |
-| Mimi   | Los Angeles | Worker |
-| Huanhu | Home | Worker |
-| *(+ more)* | Various | Workers |
-
-The system processes hundreds of tasks daily with automatic cost balancing across nodes.
-
----
-
-## 📁 Project Structure
+## Project Structure
 
 ```
 catbus/
 ├── catbus/
 │   ├── core/
-│   │   ├── node.py          # Node lifecycle management
-│   │   ├── task.py          # Task submission & tracking
-│   │   └── state.py         # Three-layer state tree (Desired/Actual/Drift)
+│   │   ├── node.py              # Robot lifecycle & identity
+│   │   ├── task.py              # Task submission & tracking
+│   │   └── state.py             # Desired / Actual / Drift state tree
 │   ├── transport/
-│   │   └── zenoh_transport.py   # Zenoh P2P communication layer
+│   │   └── zenoh_transport.py   # Zenoh P2P communication
+│   ├── discovery/
+│   │   └── capabilities.py      # Capability announcement & matching
 │   ├── agents/
-│   │   └── openclaw.py      # OpenClaw agent integration
-│   └── dashboard/           # Monitoring web UI
+│   │   └── openclaw.py          # OpenClaw agent integration
+│   └── dashboard/               # Monitoring web UI
 ├── examples/
-│   ├── single_node/         # Getting started example
-│   ├── multi_node/          # Distributed setup
-│   └── seo_workflow/        # Real-world workflow example
+│   ├── two_robots/              # Minimal two-robot setup
+│   ├── team_fleet/              # Team deployment with 5+ nodes
+│   └── seo_workflow/            # Real-world SEO pipeline
 ├── config.example.yaml
-├── docker-compose.example.yml
 └── docs/
 ```
 
 ---
 
-## 🐳 Docker
+## Docker
 
 ```bash
-# Single node quickstart
 docker-compose -f docker-compose.example.yml up
+```
 
-# Or build your own
+Or build your own:
+
+```bash
 docker build -t catbus .
 docker run -v $(pwd)/config.yaml:/app/config.yaml catbus
 ```
 
 ---
 
-## 🛠️ Configuration Reference
+## Configuration Reference
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `node.name` | *(required)* | Unique node identifier |
+| `node.name` | *(required)* | Robot's identity on the network |
+| `node.capabilities` | `[]` | What this robot can do |
 | `zenoh.mode` | `peer` | Zenoh session mode |
 | `zenoh.endpoints` | `[]` | Local listen endpoints |
-| `zenoh.connect` | `[]` | Remote peers to connect to |
+| `zenoh.connect` | `[]` | Peers to connect to |
 | `agent.provider` | `openai` | AI provider |
-| `catbus.max_concurrent_tasks` | `3` | Max parallel tasks per node |
+| `catbus.max_concurrent_tasks` | `3` | Max parallel tasks |
 | `catbus.health_report_interval` | `3600` | Health report cadence (seconds) |
-| `catbus.telegram_token` | `""` | Telegram bot token for notifications |
+| `catbus.telegram_token` | `""` | Telegram notifications |
 
 Full reference → [docs/configuration.md](./docs/configuration.md)
 
 ---
 
-## 🤝 Contributing
+## Roadmap
 
-Contributions are welcome! Please read [CONTRIBUTING.md](./CONTRIBUTING.md) first.
+**Phase 1 — Team Tool** *(current)*
+- [x] P2P node discovery via Zenoh
+- [x] Async task submission and execution
+- [x] Three-layer state tree (Desired/Actual/Drift)
+- [x] Pull-based task distribution with claim mechanism
+- [x] Cost tracking across fleet
+- [ ] Capability-based task routing
+- [ ] Schema versioning for health data
+- [ ] Provider failover improvements
+- [ ] Web-based task submission UI
+
+**Phase 2 — Open Network** *(future)*
+- [ ] Public capability registry
+- [ ] Cross-team robot collaboration
+- [ ] Trust and permission model
+- [ ] Marketplace for robot capabilities
+
+> **Where this is going:** Today, CatBus connects your robots within your team. We're building toward an open network where any AI robot can discover and collaborate with any other — an internet of AI robots.
+
+---
+
+## Contributing
+
+Contributions welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ```bash
-# Development setup
 git clone https://github.com/xiaogong2000/catbus.git
 cd catbus
 pip install -e ".[dev]"
 pre-commit install
 ```
 
-Key areas where help is appreciated:
-- More agent integrations (beyond OpenClaw)
-- Additional workflow examples
+We especially welcome:
+- Agent integrations beyond OpenClaw
+- Workflow examples
 - Documentation improvements
-- Windows/ARM support testing
+- Windows / ARM testing
 
 ---
 
-## 📋 Roadmap
+## License
 
-- [ ] Agent capability matching (auto-route tasks to capable nodes)
-- [ ] Schema versioning for health data
-- [ ] Improved provider failover logic
-- [ ] Web-based task submission UI
-- [ ] Marketplace / "Uber for AI Bots" mode
+MIT — see [LICENSE](./LICENSE).
 
 ---
 
-## 📄 License
+## Acknowledgements
 
-MIT License — see [LICENSE](./LICENSE) for details.
-
----
-
-## 🙏 Acknowledgements
-
-- [Zenoh](https://zenoh.io/) — the incredible P2P networking layer that makes all of this possible
+- [Zenoh](https://zenoh.io/) — the P2P networking layer that makes this possible
 - [OpenClaw](https://github.com/openclaw) — AI agent framework powering the fleet
 
 ---
