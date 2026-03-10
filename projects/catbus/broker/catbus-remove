@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+REGISTRY="/opt/catbus/registry"
+PASSWD_FILE="/opt/catbus/mosquitto/config/passwd"
+
+if [ $# -lt 1 ]; then
+    echo "用法: catbus-remove <机器名>"
+    exit 1
+fi
+
+NAME="$1"
+
+if [ ! -f "$REGISTRY/$NAME.json" ]; then
+    echo "❌ 机器人 $NAME 不存在"
+    exit 1
+fi
+
+# 从 Mosquitto 删除账号
+docker exec catbus-broker mosquitto_passwd -D /mosquitto/config/passwd "$NAME" 2>/dev/null || true
+
+# 删除注册信息
+rm -f "$REGISTRY/$NAME.json"
+
+echo "✅ 已移除机器人: $NAME"

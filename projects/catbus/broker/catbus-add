@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# catbus-add <机器名> — 注册机器人并生成安装命令
+
+CATBUS_DIR="/opt/catbus"
+REGISTRY="$CATBUS_DIR/registry"
+CERT_DIR="$CATBUS_DIR/mosquitto/certs"
+PASSWD_FILE="$CATBUS_DIR/mosquitto/config/passwd"
+
+if [ $# -lt 1 ]; then
+    echo "用法: catbus-add <机器名>"
+    exit 1
+fi
+
+NAME="$1"
+
+if [ -f "$REGISTRY/$NAME.json" ]; then
+    echo "❌ 机器人 $NAME 已存在"
+    exit 1
+fi
+
+# 生成随机密码
+PASS=$(openssl rand -base64 16 | tr -d '/+=' | head -c 20)
+
+# 在 Mosquitto 中创建账号
+docker exec catbus-broker mosquitto_passwd -b /mosquitto/config/passwd "$NAME" "$PASS"
+
+# CA 证书 base64
+CA_B64=$(base64 -w0 "$CERT_DIR/ca.crt" 2>/dev/null || base64 "$CERT_DIR/ca.crt" | tr -d '\n')
+
+# 获取公网 IP
+PUBLIC_IP=$(curl -s ifconfig.me || echo "BROKER_IP")
+
+# 保存注册信息
+cat > "$REGISTRY/$NAME.json" <<EOF
+{"name":"$NAME","created":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
+EOF
+
+echo ""
+echo "✅ 已添加机器人: $NAME"
+echo ""
+echo "在 $NAME 的机器上执行以下命令即可接入："
+echo ""
+echo "────────────────── 复制下面这条命令 ──────────────────"
+echo ""
+echo "curl -fsSL https://raw.githubusercontent.com/your-repo/catbus/main/client/install-client.sh | bash -s -- \\"
+echo "  --name $NAME \\"
+echo "  --host $PUBLIC_IP \\"
+echo "  --port 8883 \\"
+echo "  --user $NAME \\"
+echo "  --pass $PASS \\"
+echo "  --ca $CA_B64"
+echo ""
+echo "─────────────────────────────────────────────────────"
