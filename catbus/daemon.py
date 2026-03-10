@@ -89,15 +89,38 @@ class CatBusDaemon:
         skill_names = [s.name for s in self.config.skills]
         log.info(f"📋 Registered skills: {skill_names}")
 
+    def _get_current_capabilities(self):
+        """Return a sorted tuple of installed skill names."""
+        skills_dir = os.path.expanduser('~/.openclaw/workspace/skills')
+        try:
+            names = [
+                d for d in os.listdir(skills_dir)
+                if os.path.isdir(os.path.join(skills_dir, d))
+            ]
+        except FileNotFoundError:
+            names = []
+        return tuple(sorted(names))
+
     async def _heartbeat_loop(self):
-        """Send heartbeat every 30 seconds."""
+        """Send heartbeat every 30 seconds; re-register on skill change every 5 minutes."""
+        scan_interval = 300  # 5 分钟
+        last_scan = time.time()
+        last_capabilities = self._get_current_capabilities()
+
         while True:
             await asyncio.sleep(30)
-            if self.ws:
-                await self._ws_send({
-                    "type": "heartbeat",
-                    "node_id": self.node_id,
-                })
+
+            # 心跳
+            await self._ws_send({'type': 'heartbeat', 'node_id': self.node_id})
+
+            # 每 5 分钟检查 skill 变更
+            if time.time() - last_scan > scan_interval:
+                last_scan = time.time()
+                current = self._get_current_capabilities()
+                if current != last_capabilities:
+                    log.info('Skill change detected, re-registering...')
+                    last_capabilities = current
+                    await self._send_register()
 
     async def _ws_listen(self):
         """Listen for incoming WebSocket messages."""
