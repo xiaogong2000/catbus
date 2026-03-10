@@ -22,6 +22,7 @@ class SkillConfig:
     description: str = ""
     handler: str = ""          # "python:module.func" or "shell:command"
     input_schema: dict = field(default_factory=dict)
+    source: str = ""           # "openclaw" = auto-generated; "" = manual
 
 
 @dataclass
@@ -81,6 +82,7 @@ def load_config() -> Config:
                 description=s.get("description", ""),
                 handler=s.get("handler", ""),
                 input_schema=s.get("input_schema", {}),
+                source=s.get("source", ""),
             ))
 
     return config

@@ -57,7 +57,7 @@ class Executor:
             elif handler.startswith("shell:"):
                 result = await self._run_shell(handler[6:], input_data)
             elif handler.startswith("gateway:"):
-                result = await self._run_gateway(handler[8:], input_data)
+                result = await self._run_gateway(handler[8:], input_data, skill_name=skill_name)
             else:
                 return ExecutionResult(
                     status="error",
@@ -143,7 +143,7 @@ class Executor:
         except json.JSONDecodeError:
             return {"result": output}
 
-    async def _run_gateway(self, model: str, input_data: dict) -> dict:
+    async def _run_gateway(self, model: str, input_data: dict, skill_name: str = "agent") -> dict:
         """
         通过 OpenClaw Gateway 执行 AI 任务。
 
@@ -151,6 +151,9 @@ class Executor:
           gateway:           — 使用默认模型
           gateway:fox        — 使用 fox 别名
           gateway:aws opus   — 使用 aws opus 别名
+
+        skill_name != 'agent' 时，自动在 prompt 前加引导语，
+        让 Gateway 优先调用对应 skill。
 
         input_data 中的字段会被拼接成自然语言任务描述：
           - 优先使用 task / prompt / message / text / content 字段
@@ -176,6 +179,14 @@ class Executor:
             task_parts.append("\n".join(extra_parts))
 
         task_text = "\n".join(task_parts) if task_parts else json.dumps(input_data, ensure_ascii=False)
+
+        # skill routing: 非 agent 时在 prompt 前注入引导语
+        if skill_name and skill_name != "agent":
+            task_text = (
+                f"Use the {skill_name} skill to complete this task. "
+                f"Only use {skill_name}, do not use other skills. "
+                f"Task: {task_text}"
+            )
 
         client = GatewayClient()
         result = await client.execute(task=task_text, model=model)

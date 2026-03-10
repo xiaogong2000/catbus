@@ -149,6 +149,77 @@ def cmd_call(args):
         sys.exit(1)
 
 
+def cmd_scan(args):
+    """Scan local OpenClaw skills and optionally add them to config.yaml."""
+    from .scanner import skills_to_config_entries
+    entries = skills_to_config_entries()
+
+    print(f"🔍 Found {len(entries)} skill(s) (including agent fallback):")
+    for e in entries:
+        print(f"  [{e.source}] {e.name:30s} — {e.description[:60]}")
+
+    if args.add:
+        _add_skills_to_config(entries)
+
+
+def _add_skills_to_config(new_entries):
+    """
+    将扫描到的 openclaw skills 写入 config.yaml。
+    - 保留 source != 'openclaw' 的 manual 条目
+    - 用新扫描结果替换所有 source == 'openclaw' 条目
+    - 打印 Added / Removed / Unchanged 变化
+    """
+    import yaml
+
+    config_file = CATBUS_HOME / "config.yaml"
+    if not config_file.exists():
+        print("❌ config.yaml not found. Run 'catbus init' first.")
+        return
+
+    with open(config_file) as f:
+        raw = yaml.safe_load(f) or {}
+
+    existing = raw.get("skills", [])
+
+    # 分离 manual 和 openclaw 条目
+    manual = [s for s in existing if s.get("source", "") != "openclaw"]
+    old_openclaw = {s["name"]: s for s in existing if s.get("source", "") == "openclaw"}
+
+    # 新扫描结果 dict
+    new_openclaw = {
+        e.name: {
+            "name": e.name,
+            "description": e.description,
+            "handler": e.handler,
+            "input_schema": e.input_schema,
+            "source": e.source,
+        }
+        for e in new_entries
+    }
+
+    # openclaw 条目优先：去掉与新 openclaw 同名的 manual 条目（避免重复）
+    manual = [s for s in manual if s["name"] not in new_openclaw]
+
+    # 计算变化
+    added = [n for n in new_openclaw if n not in old_openclaw]
+    removed = [n for n in old_openclaw if n not in new_openclaw]
+    unchanged = [n for n in new_openclaw if n in old_openclaw]
+
+    # 合并：manual + 新 openclaw
+    raw["skills"] = manual + list(new_openclaw.values())
+
+    with open(config_file, "w") as f:
+        yaml.dump(raw, f, default_flow_style=False, allow_unicode=True)
+
+    if added:
+        print(f"  ✅ Added:     {added}")
+    if removed:
+        print(f"  🗑️  Removed:   {removed}")
+    if unchanged:
+        print(f"  ➖ Unchanged: {unchanged}")
+    print(f"📝 config.yaml updated ({len(manual)} manual + {len(new_openclaw)} openclaw skills)")
+
+
 def cmd_skills(args):
     """List available skills on the network."""
     port = args.port or 9800
@@ -201,6 +272,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_skills = sub.add_parser("skills", help="List network skills")
     p_skills.add_argument("--port", type=int, default=None)
 
+    # scan
+    p_scan = sub.add_parser("scan", help="Scan local OpenClaw skills")
+    p_scan.add_argument("--add", action="store_true", help="Write results to config.yaml")
+
     return parser
 
 
@@ -218,5 +293,7 @@ def run():
         cmd_call(args)
     elif args.command == "skills":
         cmd_skills(args)
+    elif args.command == "scan":
+        cmd_scan(args)
     else:
         parser.print_help()
