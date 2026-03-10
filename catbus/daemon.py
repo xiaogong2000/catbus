@@ -8,6 +8,7 @@ CatBus Daemon — 本地常驻进程
 import asyncio
 import json
 import logging
+import os
 import time
 import uuid
 
@@ -40,14 +41,20 @@ class CatBusDaemon:
 
     async def ws_connect(self):
         """Connect to CatBus Server with auto-reconnect."""
-        retry_delay = 1
+        retry_delay = 5
         while True:
             try:
                 log.info(f"🔌 Connecting to {self.config.server}...")
-                async with websockets.connect(self.config.server) as ws:
+                # ping_interval/ping_timeout: 让 websockets 库主动检测 stale 连接
+                # 30s 发一次 ping，10s 内没收到 pong 则视为断线并抛异常
+                async with websockets.connect(
+                    self.config.server,
+                    ping_interval=30,
+                    ping_timeout=10,
+                ) as ws:
                     self.ws = ws
                     self.connected = True
-                    retry_delay = 1  # reset on success
+                    retry_delay = 5  # reset on success
                     log.info("🟢 Connected to CatBus Server")
 
                     # Register
@@ -60,13 +67,25 @@ class CatBusDaemon:
                         await self._ws_listen()
                     finally:
                         heartbeat_task.cancel()
+                        try:
+                            await heartbeat_task
+                        except asyncio.CancelledError:
+                            pass
 
-            except (websockets.exceptions.ConnectionClosed, ConnectionRefusedError, OSError) as e:
+            except (websockets.exceptions.ConnectionClosed,
+                    websockets.exceptions.WebSocketException,
+                    ConnectionRefusedError, OSError) as e:
                 self.connected = False
                 self.ws = None
                 log.warning(f"⚠️  Connection lost: {e}. Retrying in {retry_delay}s...")
                 await asyncio.sleep(retry_delay)
-                retry_delay = min(retry_delay * 2, 30)
+                retry_delay = min(retry_delay * 2, 60)
+            except Exception as e:
+                self.connected = False
+                self.ws = None
+                log.warning(f"⚠️  Unexpected error in ws_connect: {e}. Retrying in {retry_delay}s...")
+                await asyncio.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, 60)
 
     async def _send_register(self):
         """Send REGISTER message to server."""
@@ -110,8 +129,16 @@ class CatBusDaemon:
         while True:
             await asyncio.sleep(30)
 
-            # 心跳
-            await self._ws_send({'type': 'heartbeat', 'node_id': self.node_id})
+            # 心跳 — 发送失败说明连接已断，主动触发重连
+            ok = await self._ws_send({'type': 'heartbeat', 'node_id': self.node_id})
+            if not ok:
+                log.warning("💔 Heartbeat send failed — closing stale connection to trigger reconnect")
+                if self.ws:
+                    try:
+                        await self.ws.close()
+                    except Exception:
+                        pass
+                return  # 退出 heartbeat_loop，让 ws_connect 重连循环接管
 
             # 每 5 分钟检查 skill 变更
             if time.time() - last_scan > scan_interval:
@@ -202,13 +229,25 @@ class CatBusDaemon:
         if future and not future.done():
             future.set_result(data)
 
-    async def _ws_send(self, msg: dict):
-        """Send JSON over WebSocket."""
+    async def _ws_send(self, msg: dict) -> bool:
+        """Send JSON over WebSocket. Returns True on success, False on failure."""
         if self.ws:
             try:
-                await self.ws.send(json.dumps(msg))
-            except websockets.exceptions.ConnectionClosed:
+                await asyncio.wait_for(self.ws.send(json.dumps(msg)), timeout=10)
+                return True
+            except asyncio.TimeoutError:
+                log.warning("⚠️  ws_send timed out (stale connection?)")
                 self.connected = False
+                return False
+            except websockets.exceptions.ConnectionClosed as e:
+                log.warning(f"⚠️  ws_send failed (connection closed): {e}")
+                self.connected = False
+                return False
+            except Exception as e:
+                log.warning(f"⚠️  ws_send unexpected error: {e}")
+                self.connected = False
+                return False
+        return False
 
     # ─── Outbound Requests (Caller role) ───────────────────────
 
