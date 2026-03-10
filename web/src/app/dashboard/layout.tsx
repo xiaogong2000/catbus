@@ -25,10 +25,10 @@ export default function DashboardLayout({
   const pathname = usePathname();
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex -mx-6">
       {/* Sidebar */}
       <aside className="w-56 shrink-0 hidden md:block glass-subtle border-r border-[hsl(var(--glass-border))]">
-        <div className="sticky top-0 pt-6 px-4">
+        <div className="sticky top-14 pt-6 px-4">
           <Link
             href="/"
             className="font-bold text-[16px] text-text px-3 mb-8 block"

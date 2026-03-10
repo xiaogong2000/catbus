@@ -13,13 +13,13 @@ import Link from "next/link";
 
 
 const agentLogos = [
+  { name: "OpenClaw", logo: "/logos/openclaw.svg" },
+  { name: "Manus", logo: "/logos/manus.svg" },
   { name: "OpenAI", logo: "/logos/openai.svg" },
-  { name: "Anthropic", logo: "/logos/anthropic.svg" },
+  { name: "Gemini", logo: "/logos/gemini.svg" },
+  { name: "Claude", logo: "/logos/claude.svg" },
+  { name: "Antigravity", logo: "/logos/antigravity.svg" },
   { name: "LangChain", logo: "/logos/langchain.svg" },
-  { name: "AutoGPT", logo: "/logos/autogpt.svg" },
-  { name: "CrewAI", logo: "/logos/crewai.svg" },
-  { name: "MetaGPT", logo: "/logos/metagpt.svg" },
-  { name: "BabyAGI", logo: "/logos/babyagi.svg" },
   { name: "HuggingFace", logo: "/logos/huggingface.svg" },
 ];
 
@@ -200,23 +200,26 @@ $ catbus serve`}
               {t("home.protocol.desc")}
             </p>
           </AnimateIn>
-          <StaggerContainer className="flex flex-wrap items-center gap-4">
-            {agentLogos.map((item) => (
-              <StaggerItem key={item.name}>
-                <div className="border border-border rounded-lg px-5 py-3 flex items-center gap-2.5 text-[13px] text-text-dim hover:border-border-hover hover:text-text transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_-2px_hsl(var(--c-primary)/0.1)]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={item.logo}
-                    alt={item.name}
-                    width={18}
-                    height={18}
-                    className="invert opacity-60"
-                  />
-                  {item.name}
-                </div>
-              </StaggerItem>
-            ))}
-          </StaggerContainer>
+          <AnimateIn delay={0.15}>
+            <div className="glass rounded-xl p-6">
+              <div className="grid grid-cols-4 sm:grid-cols-8 gap-6">
+                {agentLogos.map((item) => (
+                  <div key={item.name} className="flex flex-col items-center gap-2.5 group">
+                    <div className="w-14 h-14 rounded-xl bg-bg-elevated border border-border flex items-center justify-center transition-all duration-300 group-hover:border-border-hover group-hover:-translate-y-0.5 group-hover:shadow-[0_4px_16px_-4px_hsl(var(--c-primary)/0.2)]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={item.logo}
+                        alt={item.name}
+                        width={28}
+                        height={28}
+                      />
+                    </div>
+                    <span className="text-[12px] text-text-dim group-hover:text-text transition-colors duration-300">{item.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </AnimateIn>
         </section>
 
         {/* Trust & Verification */}
