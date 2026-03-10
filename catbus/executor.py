@@ -1,9 +1,10 @@
 """
 CatBus Skill 执行器
 
-支持两种 handler：
+支持三种 handler：
   python:module.func   — 动态 import 并调用 Python 函数
   shell:command        — subprocess 执行 shell 命令
+  gateway:model_name   — 通过 OpenClaw Gateway 执行 AI 任务（model_name 可省略，省略时用 default）
 """
 
 import asyncio
@@ -15,6 +16,7 @@ import time
 from dataclasses import dataclass
 
 from .config import SkillConfig
+from .gateway import GatewayClient
 
 log = logging.getLogger("catbus.executor")
 
@@ -54,6 +56,8 @@ class Executor:
                 result = await self._run_python(handler[7:], input_data)
             elif handler.startswith("shell:"):
                 result = await self._run_shell(handler[6:], input_data)
+            elif handler.startswith("gateway:"):
+                result = await self._run_gateway(handler[8:], input_data)
             else:
                 return ExecutionResult(
                     status="error",
@@ -138,3 +142,45 @@ class Executor:
             return json.loads(output)
         except json.JSONDecodeError:
             return {"result": output}
+
+    async def _run_gateway(self, model: str, input_data: dict) -> dict:
+        """
+        通过 OpenClaw Gateway 执行 AI 任务。
+
+        handler 格式：
+          gateway:           — 使用默认模型
+          gateway:fox        — 使用 fox 别名
+          gateway:aws opus   — 使用 aws opus 别名
+
+        input_data 中的字段会被拼接成自然语言任务描述：
+          - 优先使用 task / prompt / message / text / content 字段
+          - 其余字段以 key: value 形式追加
+        """
+        model = model.strip() or "default"
+        log.info(f"  Running gateway handler, model={model}")
+
+        # 把 input_data 转成自然语言描述
+        primary_keys = ("task", "prompt", "message", "text", "content")
+        task_parts = []
+        extra_parts = []
+
+        for key in primary_keys:
+            if key in input_data:
+                task_parts.append(str(input_data[key]))
+
+        for key, val in input_data.items():
+            if key not in primary_keys:
+                extra_parts.append(f"{key}: {val}")
+
+        if extra_parts:
+            task_parts.append("\n".join(extra_parts))
+
+        task_text = "\n".join(task_parts) if task_parts else json.dumps(input_data, ensure_ascii=False)
+
+        client = GatewayClient()
+        result = await client.execute(task=task_text, model=model)
+
+        if not result.get("ok"):
+            raise RuntimeError(f"Gateway execution failed: {result.get('summary', 'unknown error')}")
+
+        return result
