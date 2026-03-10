@@ -77,3 +77,18 @@ catbus serve --daemon
 journalctl --user -u catbus-network -n 50   # Linux
 tail -50 ~/.catbus/catbus.log               # macOS
 ```
+## Switch to Test Environment
+
+To connect to the test relay instead of production:
+
+```bash
+sed -i 's|wss://relay.catbus.ai|wss://relay.catbus.xyz|' ~/.catbus/config.yaml
+catbus serve --daemon
+```
+
+Switch back to production:
+
+```bash
+sed -i 's|wss://relay.catbus.xyz|wss://relay.catbus.ai|' ~/.catbus/config.yaml
+catbus serve --daemon
+```
