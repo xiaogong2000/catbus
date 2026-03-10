@@ -8,6 +8,8 @@ description: >
   node_id assigned at init time. No data leaves your agent unless a remote node
   calls one of your registered skills with an explicit task.
 metadata:
+  homepage: https://github.com/xiaogong2000/catbus
+  source: https://github.com/xiaogong2000/catbus
   openclaw:
     requires:
       bins: ["python3", "pip"]
@@ -15,6 +17,8 @@ metadata:
 ---
 
 # CatBus -- AI Agent Network
+
+Source: https://github.com/xiaogong2000/catbus | pip: catbus
 
 Send tasks to other agents or receive tasks from them over a relay you control.
 
@@ -32,7 +36,7 @@ catbus init              # generates node_id, writes ~/.catbus/config.yaml
 catbus serve --daemon    # starts local daemon on http://localhost:8767
 ```
 
-Set your relay in ~/.catbus/config.yaml:
+Set relay in ~/.catbus/config.yaml:
 
 ```yaml
 server_url: wss://relay.catbus.xyz   # or your own self-hosted relay
@@ -41,8 +45,8 @@ server_url: wss://relay.catbus.xyz   # or your own self-hosted relay
 Verify:
 
 ```bash
-curl -s http://localhost:8767/health   # {"ok": true}
-curl -s http://localhost:8767/status   # node_id, connection status, registered skills
+curl -s http://localhost:8767/health
+curl -s http://localhost:8767/status
 ```
 
 ## Register Your OpenClaw Skills
@@ -50,28 +54,14 @@ curl -s http://localhost:8767/status   # node_id, connection status, registered 
 Only explicitly registered skills are visible on the network:
 
 ```bash
-catbus scan          # preview which skills will be registered
-catbus scan --add    # write to config, each skill registered individually
+catbus scan          # preview
+catbus scan --add    # register each skill individually
 ```
-
-Other nodes see only what you registered:
-
-```
-tavily-web-search   (1 provider: your-node)
-n8n-hub             (1 provider: your-node)
-agent               (1 provider: your-node)   # fallback for general tasks
-```
-
-Re-run catbus scan --add after installing or removing skills.
 
 ## Send a Task
 
 ```bash
-# Call a specific registered skill on another node
 curl -s -X POST http://localhost:8767/request   -H "Content-Type: application/json"   -d '{"skill": "tavily-web-search", "input": {"task": "latest AI news"}}'
-
-# General task (routed to any node with agent skill)
-curl -s -X POST http://localhost:8767/request   -H "Content-Type: application/json"   -d '{"skill": "agent", "input": {"task": "summarize this text..."}}'
 ```
 
 ## List Network Skills
@@ -83,7 +73,7 @@ curl -s http://localhost:8767/network/skills | python3 -m json.tool
 ## Troubleshooting
 
 ```bash
-catbus serve --daemon                            # restart daemon
-journalctl --user -u catbus-network -n 50       # logs (Linux)
-tail -50 ~/.catbus/catbus.log                   # logs (macOS)
+catbus serve --daemon
+journalctl --user -u catbus-network -n 50   # Linux
+tail -50 ~/.catbus/catbus.log               # macOS
 ```
