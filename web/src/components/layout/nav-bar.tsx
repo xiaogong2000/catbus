@@ -5,17 +5,19 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { Menu, X, LogOut, LayoutDashboard } from "lucide-react";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { SettingsDropdown } from "@/components/settings-dropdown";
+import { useLocale } from "@/components/locale-provider";
 
-const navLinks = [
-  { label: "Network", href: "/network" },
-  { label: "Skills", href: "/network/skills" },
-  { label: "Nodes", href: "/network/nodes" },
-  { label: "Docs", href: "/docs" },
+const navKeys = [
+  { key: "nav.network", href: "/network" },
+  { key: "nav.skills", href: "/network/skills" },
+  { key: "nav.nodes", href: "/network/nodes" },
+  { key: "nav.docs", href: "/docs" },
 ];
 
 export function NavBar() {
   const { data: session } = useSession();
+  const { t } = useLocale();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -55,19 +57,19 @@ export function NavBar() {
             CatBus
           </Link>
           <div className="hidden md:flex items-center gap-1">
-            {navLinks.map((link) => (
+            {navKeys.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 className="px-2 py-1 text-[13px] font-medium text-text-dim hover:text-text transition-[color] duration-[--motion-base]"
               >
-                {link.label}
+                {t(link.key)}
               </Link>
             ))}
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <ThemeToggle />
+          <SettingsDropdown />
 
           {user ? (
             /* Logged-in: avatar + dropdown */
@@ -111,14 +113,14 @@ export function NavBar() {
                     onClick={() => setUserMenuOpen(false)}
                   >
                     <LayoutDashboard size={14} />
-                    Dashboard
+                    {t("nav.dashboard")}
                   </Link>
                   <button
                     onClick={() => signOut({ callbackUrl: "/" })}
                     className="flex items-center gap-2 w-full px-3 py-2 text-[13px] text-text-dim hover:text-text hover:bg-bg-subtle transition-[color,background] duration-[--motion-base] cursor-pointer"
                   >
                     <LogOut size={14} />
-                    Sign Out
+                    {t("nav.signOut")}
                   </button>
                 </div>
               )}
@@ -130,13 +132,13 @@ export function NavBar() {
                 href="/login"
                 className="hidden md:inline text-[13px] font-medium text-text-dim hover:text-text transition-[color] duration-[--motion-base]"
               >
-                Sign In
+                {t("nav.signIn")}
               </Link>
               <Link
                 href="/login"
                 className="hidden md:inline text-[13px] font-medium text-text border border-border rounded-md px-4 py-1.5 hover:border-border-hover transition-[border-color] duration-[--motion-base]"
               >
-                Sign Up
+                {t("nav.signUp")}
               </Link>
             </>
           )}
@@ -155,14 +157,14 @@ export function NavBar() {
       {/* Mobile dropdown menu */}
       {mobileOpen && (
         <div className="md:hidden border-t border-[hsl(var(--glass-border))] px-6 py-4 space-y-3 glass">
-          {navLinks.map((link) => (
+          {navKeys.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               onClick={() => setMobileOpen(false)}
               className="block px-2 py-1.5 text-[14px] font-medium text-text-dim hover:text-text transition-[color] duration-[--motion-base]"
             >
-              {link.label}
+              {t(link.key)}
             </Link>
           ))}
           <div className="border-t border-border pt-3 space-y-3">
@@ -173,13 +175,13 @@ export function NavBar() {
                   onClick={() => setMobileOpen(false)}
                   className="block px-2 py-1.5 text-[14px] font-medium text-text-dim hover:text-text transition-[color] duration-[--motion-base]"
                 >
-                  Dashboard
+                  {t("nav.dashboard")}
                 </Link>
                 <button
                   onClick={() => signOut({ callbackUrl: "/" })}
                   className="block w-full text-left px-2 py-1.5 text-[14px] font-medium text-text-dim hover:text-text transition-[color] duration-[--motion-base] cursor-pointer"
                 >
-                  Sign Out
+                  {t("nav.signOut")}
                 </button>
               </>
             ) : (
@@ -189,14 +191,14 @@ export function NavBar() {
                   onClick={() => setMobileOpen(false)}
                   className="block px-2 py-1.5 text-[14px] font-medium text-text-dim hover:text-text transition-[color] duration-[--motion-base]"
                 >
-                  Sign In
+                  {t("nav.signIn")}
                 </Link>
                 <Link
                   href="/login"
                   onClick={() => setMobileOpen(false)}
                   className="block px-2 py-1.5 text-[14px] font-medium text-text border border-border rounded-md text-center hover:border-border-hover transition-[border-color] duration-[--motion-base]"
                 >
-                  Sign Up
+                  {t("nav.signUp")}
                 </Link>
               </>
             )}

@@ -1,14 +1,19 @@
+"use client";
+
 import { Suspense } from "react";
 import { SkillsContent } from "./skills-content";
 import { PageHeader } from "@/components/layout/page-header";
+import { useLocale } from "@/components/locale-provider";
 
 export default function SkillsPage() {
+  const { t } = useLocale();
+
   return (
     <div className="py-10">
       <PageHeader
-        eyebrow="SKILLS"
-        title="Skill Directory"
-        description="Browse all skills available on the CatBus network."
+        eyebrow={t("skills.eyebrow")}
+        title={t("skills.title")}
+        description={t("skills.desc")}
       />
       <Suspense
         fallback={

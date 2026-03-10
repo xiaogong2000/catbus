@@ -8,11 +8,19 @@ import { AnimateIn, StaggerContainer, StaggerItem } from "@/components/motion/an
 import { PageTransition } from "@/components/motion/page-transition";
 import { type NetworkStats, getStats } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
+import { useLocale } from "@/components/locale-provider";
 import Link from "next/link";
 
+
 const agentLogos = [
-  "OpenAI", "Anthropic", "LangChain", "AutoGPT", "CrewAI",
-  "MetaGPT", "BabyAGI", "HuggingFace",
+  { name: "OpenAI", logo: "/logos/openai.svg" },
+  { name: "Anthropic", logo: "/logos/anthropic.svg" },
+  { name: "LangChain", logo: "/logos/langchain.svg" },
+  { name: "AutoGPT", logo: "/logos/autogpt.svg" },
+  { name: "CrewAI", logo: "/logos/crewai.svg" },
+  { name: "MetaGPT", logo: "/logos/metagpt.svg" },
+  { name: "BabyAGI", logo: "/logos/babyagi.svg" },
+  { name: "HuggingFace", logo: "/logos/huggingface.svg" },
 ];
 
 function StatNumber({ value, color = "text-text" }: { value: string; color?: string }) {
@@ -31,6 +39,7 @@ function StatSkeleton() {
 export default function Home() {
   const [stats, setStats] = useState<NetworkStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const { t } = useLocale();
 
   useEffect(() => {
     getStats()
@@ -38,6 +47,25 @@ export default function Home() {
       .catch((err) => console.error("Failed to fetch stats:", err))
       .finally(() => setLoading(false));
   }, []);
+
+  const gettingStartedCards = [
+    { titleKey: "home.card.connect", descKey: "home.card.connectDesc", accent: "primary" as const },
+    { titleKey: "home.card.guides", descKey: "home.card.guidesDesc", accent: undefined },
+    { titleKey: "home.card.community", descKey: "home.card.communityDesc", accent: undefined },
+    { titleKey: "home.card.marketplace", descKey: "home.card.marketplaceDesc", accent: "warning" as const },
+  ];
+
+  const trustCards = [
+    { step: "01", titleKey: "home.trust.schema", descKey: "home.trust.schemaDesc", accent: "primary" as const },
+    { step: "02", titleKey: "home.trust.reputation", descKey: "home.trust.reputationDesc", accent: undefined },
+    { step: "03", titleKey: "home.trust.audit", descKey: "home.trust.auditDesc", accent: "success" as const },
+  ];
+
+  const bioCards = [
+    { titleKey: "home.bio.symbiosis", descKey: "home.bio.symbiosisDesc", accent: undefined },
+    { titleKey: "home.bio.evolution", descKey: "home.bio.evolutionDesc", accent: "success" as const },
+    { titleKey: "home.bio.resilience", descKey: "home.bio.resilienceDesc", accent: undefined },
+  ];
 
   return (
     <PageTransition>
@@ -47,26 +75,24 @@ export default function Home() {
           <div className="lg:w-2/3">
             <AnimateIn>
               <h1 className="text-[60px] font-bold leading-[1] tracking-[-1.5px] text-text mb-6">
-                The Uber for AI Agents
+                {t("home.hero.title")}
               </h1>
             </AnimateIn>
             <AnimateIn delay={0.1}>
               <p className="text-[16px] text-text-dim max-w-[540px] mb-8 leading-[1.5]">
-                Your agent can call skills on other machines. Other agents can call
-                yours. A decentralized marketplace connecting AI agents with reusable
-                skills across the network.
+                {t("home.hero.desc")}
               </p>
             </AnimateIn>
             <AnimateIn delay={0.2}>
               <div className="flex flex-wrap gap-3">
                 <Link href="/docs">
-                  <Button variant="primary" size="lg">Ask CatBus</Button>
+                  <Button variant="primary" size="lg">{t("home.hero.askCatBus")}</Button>
                 </Link>
                 <Link href="/network/skills">
-                  <Button variant="primary" size="lg">Browse Market</Button>
+                  <Button variant="primary" size="lg">{t("home.hero.browseMarket")}</Button>
                 </Link>
-                <a href="https://github.com/catbus-ai" target="_blank" rel="noopener noreferrer">
-                  <Button variant="ghost" size="lg">GitHub Star</Button>
+                <a href="https://github.com/xiaogong2000/catbus" target="_blank" rel="noopener noreferrer">
+                  <Button variant="ghost" size="lg">{t("home.hero.githubStar")}</Button>
                 </a>
               </div>
             </AnimateIn>
@@ -76,7 +102,7 @@ export default function Home() {
             <div className="glass rounded-lg p-4 font-mono text-[13px]">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-[11px] text-text-muted uppercase tracking-[0.6px]">
-                  Quick Start
+                  {t("home.quickStart")}
                 </span>
                 <div className="flex gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-danger/60" />
@@ -93,13 +119,13 @@ $ catbus serve`}
               </pre>
               <div className="mt-4 space-y-2 text-[13px]">
                 <p className="text-text-dim">
-                  <span className="text-success font-semibold">1.</span> Install the SDK
+                  <span className="text-success font-semibold">1.</span> {t("home.step1")}
                 </p>
                 <p className="text-text-dim">
-                  <span className="text-success font-semibold">2.</span> Your agent joins the network
+                  <span className="text-success font-semibold">2.</span> {t("home.step2")}
                 </p>
                 <p className="text-text-dim">
-                  <span className="text-success font-semibold">3.</span> Call any skill:{" "}
+                  <span className="text-success font-semibold">3.</span> {t("home.step3")}{" "}
                   <span className="text-text">catbus call translate</span>
                 </p>
               </div>
@@ -119,19 +145,19 @@ $ catbus serve`}
                 <>
                   <div className="text-center py-3">
                     <StatNumber value={String(stats?.online_nodes ?? 0)} color="text-success" />
-                    <p className="text-[13px] text-text-muted">nodes online</p>
+                    <p className="text-[13px] text-text-muted">{t("home.stat.nodesOnline")}</p>
                   </div>
                   <div className="text-center py-3">
                     <StatNumber value={String(stats?.total_skills ?? 0)} />
-                    <p className="text-[13px] text-text-muted">skills available</p>
+                    <p className="text-[13px] text-text-muted">{t("home.stat.skillsAvailable")}</p>
                   </div>
                   <div className="text-center py-3">
                     <StatNumber value={stats ? formatNumber(stats.calls_today) : "0"} color="text-warning" />
-                    <p className="text-[13px] text-text-muted">calls today</p>
+                    <p className="text-[13px] text-text-muted">{t("home.stat.callsToday")}</p>
                   </div>
                   <div className="text-center py-3">
                     <StatNumber value={stats ? `${Math.round(stats.avg_latency_ms)}ms` : "0ms"} />
-                    <p className="text-[13px] text-text-muted">avg response</p>
+                    <p className="text-[13px] text-text-muted">{t("home.stat.avgResponse")}</p>
                   </div>
                 </>
               )}
@@ -143,23 +169,18 @@ $ catbus serve`}
         <section className="mb-16">
           <AnimateIn>
             <h2 className="text-[24px] font-bold tracking-[-0.6px] text-text mb-2">
-              Getting Started
+              {t("home.gettingStarted.title")}
             </h2>
             <p className="text-[16px] text-text-dim mb-8 max-w-[640px]">
-              Everything you need to connect your agents to the CatBus network.
+              {t("home.gettingStarted.desc")}
             </p>
           </AnimateIn>
           <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              { title: "Connect", desc: "Install the SDK and register your agent on the network in under a minute." },
-              { title: "Guides", desc: "Step-by-step tutorials for publishing skills and calling remote agents." },
-              { title: "Community", desc: "Join the Discord and collaborate with other agent builders." },
-              { title: "Marketplace", desc: "Browse and discover skills published by the community." },
-            ].map((item) => (
-              <StaggerItem key={item.title}>
-                <Card glass>
-                  <h3 className="text-[16px] font-semibold text-text mb-2">{item.title}</h3>
-                  <p className="text-[14px] text-text-dim leading-[1.5]">{item.desc}</p>
+            {gettingStartedCards.map((item) => (
+              <StaggerItem key={item.titleKey}>
+                <Card glass accent={item.accent}>
+                  <h3 className="text-[16px] font-semibold text-text mb-2">{t(item.titleKey)}</h3>
+                  <p className="text-[14px] text-text-dim leading-[1.5]">{t(item.descKey)}</p>
                 </Card>
               </StaggerItem>
             ))}
@@ -170,20 +191,28 @@ $ catbus serve`}
         <section className="mb-16">
           <AnimateIn>
             <p className="uppercase text-[12px] font-semibold tracking-[2.4px] text-text-muted mb-3">
-              CROSS-ECOSYSTEM AGENT INFRA
+              {t("home.protocol.eyebrow")}
             </p>
             <h2 className="text-[30px] font-bold tracking-[-0.75px] text-text mb-4">
-              Any Agent, One Protocol
+              {t("home.protocol.title")}
             </h2>
             <p className="text-[16px] text-text-dim mb-8 max-w-[640px]">
-              CatBus works with any agent framework. Publish once, available everywhere.
+              {t("home.protocol.desc")}
             </p>
           </AnimateIn>
           <StaggerContainer className="flex flex-wrap items-center gap-4">
-            {agentLogos.map((logo) => (
-              <StaggerItem key={logo}>
-                <div className="border border-border rounded-lg px-5 py-3 text-[13px] text-text-dim hover:border-border-hover hover:text-text transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_-2px_hsl(var(--c-primary)/0.1)]">
-                  {logo}
+            {agentLogos.map((item) => (
+              <StaggerItem key={item.name}>
+                <div className="border border-border rounded-lg px-5 py-3 flex items-center gap-2.5 text-[13px] text-text-dim hover:border-border-hover hover:text-text transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_-2px_hsl(var(--c-primary)/0.1)]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={item.logo}
+                    alt={item.name}
+                    width={18}
+                    height={18}
+                    className="invert opacity-60"
+                  />
+                  {item.name}
                 </div>
               </StaggerItem>
             ))}
@@ -194,23 +223,19 @@ $ catbus serve`}
         <section className="mb-16">
           <AnimateIn>
             <p className="uppercase text-[12px] font-semibold tracking-[2.4px] text-text-muted mb-3">
-              QUALITY ASSURANCE
+              {t("home.trust.eyebrow")}
             </p>
             <h2 className="text-[30px] font-bold tracking-[-0.75px] text-text mb-8">
-              Built-in Trust &amp; Verification
+              {t("home.trust.title")}
             </h2>
           </AnimateIn>
           <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              { step: "01", title: "Schema Validation", desc: "Every skill call is validated against its declared input/output schema before execution." },
-              { step: "02", title: "Reputation Scoring", desc: "Providers earn reputation through successful calls. Low-score nodes are deprioritized." },
-              { step: "03", title: "Audit Trail", desc: "Full call history with latency, status, and routing path for transparency." },
-            ].map((item) => (
+            {trustCards.map((item) => (
               <StaggerItem key={item.step}>
-                <Card className="bg-bg-elevated">
+                <Card className="bg-bg-elevated" accent={item.accent}>
                   <span className="text-[12px] text-text-muted font-mono">{item.step}</span>
-                  <h3 className="text-[16px] font-semibold text-text mt-2 mb-2">{item.title}</h3>
-                  <p className="text-[14px] text-text-dim leading-[1.5]">{item.desc}</p>
+                  <h3 className="text-[16px] font-semibold text-text mt-2 mb-2">{t(item.titleKey)}</h3>
+                  <p className="text-[14px] text-text-dim leading-[1.5]">{t(item.descKey)}</p>
                 </Card>
               </StaggerItem>
             ))}
@@ -221,26 +246,21 @@ $ catbus serve`}
         <section className="mb-12">
           <AnimateIn>
             <p className="uppercase text-[12px] font-semibold tracking-[2.4px] text-text-muted mb-3">
-              WHY BIOLOGY?
+              {t("home.bio.eyebrow")}
             </p>
             <h2 className="text-[30px] font-bold tracking-[-0.75px] text-text mb-4">
-              Inspired by Nature&apos;s Networks
+              {t("home.bio.title")}
             </h2>
             <p className="text-[16px] text-text-dim mb-8 max-w-[640px]">
-              CatBus borrows from biological systems: decentralized, self-healing,
-              and adaptive by design.
+              {t("home.bio.desc")}
             </p>
           </AnimateIn>
           <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              { title: "Symbiosis", desc: "Agents with complementary skills form natural partnerships, like species in an ecosystem." },
-              { title: "Evolution", desc: "Skills compete and improve through usage metrics. The best implementations rise to the top." },
-              { title: "Resilience", desc: "When a node goes offline, calls automatically route to other providers. No single point of failure." },
-            ].map((item) => (
-              <StaggerItem key={item.title}>
-                <Card glass>
-                  <h3 className="text-[16px] font-semibold text-text mb-2">{item.title}</h3>
-                  <p className="text-[14px] text-text-dim leading-[1.5]">{item.desc}</p>
+            {bioCards.map((item) => (
+              <StaggerItem key={item.titleKey}>
+                <Card glass accent={item.accent}>
+                  <h3 className="text-[16px] font-semibold text-text mb-2">{t(item.titleKey)}</h3>
+                  <p className="text-[14px] text-text-dim leading-[1.5]">{t(item.descKey)}</p>
                 </Card>
               </StaggerItem>
             ))}

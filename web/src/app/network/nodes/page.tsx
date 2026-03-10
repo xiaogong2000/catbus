@@ -11,8 +11,10 @@ import { thClass, tdBaseClass } from "@/lib/table-styles";
 import { type ApiNode, getNodes } from "@/lib/api";
 import { formatUptime } from "@/lib/mock-data-dashboard";
 import { Server } from "lucide-react";
+import { useLocale } from "@/components/locale-provider";
 
 export default function NodesPage() {
+  const { t } = useLocale();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [nodes, setNodes] = useState<ApiNode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,9 +30,9 @@ export default function NodesPage() {
     <PageTransition>
       <div className="py-10">
         <PageHeader
-          eyebrow="NODES"
-          title="Online Nodes"
-          description="All nodes currently connected to the CatBus network."
+          eyebrow={t("nodes.eyebrow")}
+          title={t("nodes.title")}
+          description={t("nodes.desc")}
         />
 
         {loading ? (
@@ -42,12 +44,12 @@ export default function NodesPage() {
         ) : nodes.length === 0 ? (
           <EmptyState
             icon={<Server size={24} className="text-text-dim" />}
-            title="No nodes online"
-            description="No agents are currently connected to the network. Be the first to join!"
+            title={t("nodes.empty.title")}
+            description={t("nodes.empty.desc")}
             steps={[
-              { label: "Install CatBus SDK: pip install catbus" },
-              { label: "Initialize your agent: catbus init" },
-              { label: "Start serving: catbus serve" },
+              { label: t("nodes.empty.step1") },
+              { label: t("nodes.empty.step2") },
+              { label: t("nodes.empty.step3") },
             ]}
           />
         ) : (
@@ -56,7 +58,7 @@ export default function NodesPage() {
               <table className="w-full border-collapse">
                 <thead>
                   <tr>
-                    {["Node Name", "Node ID", "Skills", "Uptime", "Status"].map((h) => (
+                    {[t("nodes.table.name"), t("nodes.table.nodeId"), t("nodes.table.skills"), t("nodes.table.uptime"), t("nodes.table.status")].map((h) => (
                       <th key={h} className={thClass}>{h}</th>
                     ))}
                   </tr>
@@ -75,14 +77,14 @@ export default function NodesPage() {
                         <td className={cn(tdBaseClass, "text-[14px]")}>
                           <span className="inline-flex items-center gap-1.5 text-success text-[13px]">
                             <span className="w-1.5 h-1.5 rounded-full bg-success" />
-                            {node.status}
+                            {t(`status.${node.status}`)}
                           </span>
                         </td>
                       </tr>
                       {expanded === node.node_id && (
                         <tr>
                           <td colSpan={5} className="px-4 py-4 border-b border-border bg-bg-subtle">
-                            <p className="text-[12px] uppercase tracking-[0.6px] text-text-muted mb-2">Skills provided</p>
+                            <p className="text-[12px] uppercase tracking-[0.6px] text-text-muted mb-2">{t("nodes.skillsProvided")}</p>
                             <div className="flex flex-wrap gap-2">
                               {node.skills.map((s) => (
                                 <span key={s} className="bg-bg-elevated border border-border rounded-full px-3 py-1 text-[12px] text-text-dim">

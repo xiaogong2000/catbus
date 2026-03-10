@@ -12,25 +12,27 @@ import { PageTransition } from "@/components/motion/page-transition";
 import { type NetworkStats, type ApiSkill, getStats, getSkills } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { Globe } from "lucide-react";
-
-const columns = [
-  { key: "name", label: "Skill", sortable: true },
-  { key: "providers", label: "Providers", sortable: true },
-  { key: "calls_today", label: "Calls Today", sortable: true },
-  {
-    key: "avg_latency_ms",
-    label: "Avg Latency",
-    sortable: true,
-    render: (row: Record<string, unknown>) => (
-      <span className="text-warning font-mono">{row.avg_latency_ms as number}ms</span>
-    ),
-  },
-];
+import { useLocale } from "@/components/locale-provider";
 
 export default function NetworkPage() {
+  const { t } = useLocale();
   const [stats, setStats] = useState<NetworkStats | null>(null);
   const [skills, setSkills] = useState<ApiSkill[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const columns = [
+    { key: "name", label: t("network.table.skill"), sortable: true },
+    { key: "providers", label: t("network.table.providers"), sortable: true },
+    { key: "calls_today", label: t("network.table.callsToday"), sortable: true },
+    {
+      key: "avg_latency_ms",
+      label: t("network.table.avgLatency"),
+      sortable: true,
+      render: (row: Record<string, unknown>) => (
+        <span className="text-warning font-mono">{row.avg_latency_ms as number}ms</span>
+      ),
+    },
+  ];
 
   useEffect(() => {
     Promise.all([
@@ -45,9 +47,9 @@ export default function NetworkPage() {
     <PageTransition>
       <div className="py-10">
         <PageHeader
-          eyebrow="NETWORK"
-          title="Network Overview"
-          description="Real-time health and activity of the CatBus network."
+          eyebrow={t("network.eyebrow")}
+          title={t("network.title")}
+          description={t("network.desc")}
         />
 
         {loading ? (
@@ -59,10 +61,10 @@ export default function NetworkPage() {
         ) : (
           <StatsRow
             items={[
-              { label: "Nodes Online", value: String(stats?.online_nodes ?? 0), description: "Active nodes on the network", color: "success" },
-              { label: "Skills Available", value: String(stats?.total_skills ?? 0), description: "Unique skills registered" },
-              { label: "Calls Today", value: stats ? formatNumber(stats.calls_today) : "0", description: "Total skill invocations", color: "warning" },
-              { label: "Avg Response", value: stats ? `${Math.round(stats.avg_latency_ms)}ms` : "0ms", description: "Median response time", color: "success" },
+              { label: t("network.stat.nodesOnline"), value: String(stats?.online_nodes ?? 0), description: t("network.stat.nodesOnlineDesc"), color: "success" },
+              { label: t("network.stat.skillsAvailable"), value: String(stats?.total_skills ?? 0), description: t("network.stat.skillsAvailableDesc") },
+              { label: t("network.stat.callsToday"), value: stats ? formatNumber(stats.calls_today) : "0", description: t("network.stat.callsTodayDesc"), color: "warning" },
+              { label: t("network.stat.avgResponse"), value: stats ? `${Math.round(stats.avg_latency_ms)}ms` : "0ms", description: t("network.stat.avgResponseDesc"), color: "success" },
             ]}
           />
         )}
@@ -70,7 +72,7 @@ export default function NetworkPage() {
         <AnimateIn>
           <div className="mb-10">
             <h2 className="text-[24px] font-bold tracking-[-0.6px] text-text mb-4">
-              Top Skills
+              {t("network.topSkills")}
             </h2>
             {loading ? (
               <div className="space-y-3">
@@ -81,12 +83,12 @@ export default function NetworkPage() {
             ) : skills.length === 0 ? (
               <EmptyState
                 icon={<Globe size={24} className="text-text-dim" />}
-                title="No skills registered yet"
-                description="Connect an agent to the network and publish your first skill."
+                title={t("network.empty.title")}
+                description={t("network.empty.desc")}
                 steps={[
-                  { label: "Install the CatBus SDK", href: "/docs" },
-                  { label: "Register your agent node" },
-                  { label: "Publish your first skill" },
+                  { label: t("network.empty.step1"), href: "/docs" },
+                  { label: t("network.empty.step2") },
+                  { label: t("network.empty.step3") },
                 ]}
               />
             ) : (

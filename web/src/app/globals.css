@@ -3,33 +3,33 @@
 @config "../../tailwind.config.ts";
 
 :root {
-  /* -- Background layers (light) -- */
-  --c-bg:           0 0% 100%;
-  --c-bg-subtle:    0 0% 97%;
-  --c-bg-elevated:  0 0% 94%;
+  /* -- Background layers -- */
+  --c-bg:           0 0% 0%;
+  --c-bg-subtle:    0 0% 3%;
+  --c-bg-elevated:  0 0% 6%;
 
-  /* -- Borders (light) -- */
-  --c-border:       0 0% 85%;
-  --c-border-hover: 0 0% 70%;
+  /* -- Borders -- */
+  --c-border:       0 0% 12%;
+  --c-border-hover: 0 0% 20%;
 
-  /* -- Text (light) -- */
-  --c-text:         0 0% 9%;
-  --c-text-dim:     0 0% 40%;
-  --c-text-muted:   0 0% 55%;
+  /* -- Text -- */
+  --c-text:         0 0% 93%;
+  --c-text-dim:     0 0% 60%;
+  --c-text-muted:   0 0% 50%;
 
   /* -- Semantic colors -- */
-  --c-primary:      220 100% 50%;
+  --c-primary:      220 100% 60%;
   --c-primary-fg:   0 0% 100%;
-  --c-success:      150 100% 30%;
-  --c-warning:      35 100% 45%;
-  --c-danger:       0 100% 55%;
+  --c-success:      150 100% 35%;
+  --c-warning:      35 100% 50%;
+  --c-danger:       0 100% 60%;
 
   /* -- Overlay -- */
-  --c-overlay:      hsl(0 0% 0% / 0.4);
+  --c-overlay:      hsl(0 0% 0% / 0.8);
 
   /* -- Particle color for constellation -- */
-  --c-particle:     220 30% 75%;
-  --c-particle-alpha: 0.12;
+  --c-particle:     0 0% 100%;
+  --c-particle-alpha: 0.3;
 
   /* -- Chart palette (8 colors) -- */
   --c-chart-1: hsl(239 84% 67%);
@@ -75,15 +75,15 @@
   --radius-full: 9999px;
 
   /* -- Glass -- */
-  --glass-bg:      0 0% 100% / 0.55;
-  --glass-border:  0 0% 100% / 0.25;
-  --glass-shine:   0 0% 100% / 0.12;
-  --glass-blur:    20px;
+  --glass-bg:      0 0% 100% / 0.06;
+  --glass-border:  0 0% 100% / 0.08;
+  --glass-shine:   0 0% 100% / 0.04;
+  --glass-blur:    24px;
 
-  /* -- Shadows (light) -- */
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -1px rgba(0,0,0,0.04);
-  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+  /* -- Shadows -- */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4), 0 2px 4px -1px rgba(0,0,0,0.2);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.5), 0 4px 6px -2px rgba(0,0,0,0.3);
 
   /* -- Motion -- */
   --motion-base:   0.2s;
@@ -91,30 +91,6 @@
   --ease-spring:   cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-.dark {
-  --c-bg:           0 0% 0%;
-  --c-bg-subtle:    0 0% 3%;
-  --c-bg-elevated:  0 0% 6%;
-  --c-border:       0 0% 12%;
-  --c-border-hover: 0 0% 20%;
-  --c-text:         0 0% 93%;
-  --c-text-dim:     0 0% 60%;
-  --c-text-muted:   0 0% 50%;
-  --c-primary:      220 100% 60%;
-  --c-success:      150 100% 35%;
-  --c-warning:      35 100% 50%;
-  --c-danger:       0 100% 60%;
-  --c-overlay:      hsl(0 0% 0% / 0.8);
-  --c-particle:     0 0% 100%;
-  --c-particle-alpha: 0.3;
-  --glass-bg:      0 0% 100% / 0.06;
-  --glass-border:  0 0% 100% / 0.08;
-  --glass-shine:   0 0% 100% / 0.04;
-  --glass-blur:    24px;
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4), 0 2px 4px -1px rgba(0,0,0,0.2);
-  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.5), 0 4px 6px -2px rgba(0,0,0,0.3);
-}
 
 .sr-only {
   position: absolute;
@@ -146,7 +122,99 @@ body {
 }
 
 .glass-subtle {
-  background: hsl(var(--glass-bg));
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: hsl(var(--c-bg) / 0.95);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+}
+
+/* -- Ambient glow background -- */
+.ambient-glow {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.ambient-glow::before {
+  content: "";
+  position: absolute;
+  top: -20%;
+  left: -10%;
+  width: 50%;
+  height: 60%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    hsl(var(--c-primary) / 0.06) 0%,
+    transparent 70%
+  );
+  filter: blur(80px);
+  animation: glow-drift-1 25s ease-in-out infinite alternate;
+}
+
+.ambient-glow::after {
+  content: "";
+  position: absolute;
+  bottom: -15%;
+  right: -10%;
+  width: 45%;
+  height: 55%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    hsl(var(--c-primary) / 0.04) 0%,
+    transparent 70%
+  );
+  filter: blur(80px);
+  animation: glow-drift-2 30s ease-in-out infinite alternate;
+}
+
+@keyframes glow-drift-1 {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(8%, 6%) scale(1.1); }
+  100% { transform: translate(-4%, 10%) scale(0.95); }
+}
+
+@keyframes glow-drift-2 {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(-6%, -8%) scale(1.15); }
+  100% { transform: translate(5%, -3%) scale(0.9); }
+}
+
+/* -- Noise texture overlay -- */
+.noise-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+}
+
+/* -- Third ambient blob (center) -- */
+.ambient-glow-center {
+  position: fixed;
+  top: 30%;
+  left: 40%;
+  width: 35%;
+  height: 40%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    hsl(var(--c-primary) / 0.03) 0%,
+    transparent 65%
+  );
+  filter: blur(100px);
+  pointer-events: none;
+  z-index: -1;
+  animation: glow-drift-3 35s ease-in-out infinite alternate;
+}
+
+@keyframes glow-drift-3 {
+  0%   { transform: translate(0, 0) scale(1); opacity: 0.8; }
+  50%  { transform: translate(-5%, 8%) scale(1.2); opacity: 1; }
+  100% { transform: translate(6%, -5%) scale(0.85); opacity: 0.7; }
 }

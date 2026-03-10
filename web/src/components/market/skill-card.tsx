@@ -1,6 +1,9 @@
+"use client";
+
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatNumber } from "@/lib/utils";
+import { useLocale } from "@/components/locale-provider";
 
 interface SkillCardProps {
   name: string;
@@ -21,6 +24,8 @@ export function SkillCard({
   category,
   status = "online",
 }: SkillCardProps) {
+  const { t } = useLocale();
+
   return (
     <Card>
       <div className="flex items-start justify-between mb-3">
@@ -32,21 +37,21 @@ export function SkillCard({
             </span>
           )}
         </div>
-        <Badge status={status} />
+        <Badge status={status} label={t(`status.${status}`)} />
       </div>
       <p className="text-[14px] text-text-dim mb-4 line-clamp-2">
         {description}
       </p>
       <div className="flex items-center gap-4 text-[13px] text-text-muted">
         <span>
-          Providers: <span className="text-text">{providers}</span>
+          {t("skills.card.providers")} <span className="text-text">{providers}</span>
         </span>
         <span>
-          Calls: <span className="text-text">{formatNumber(callsToday)}</span>
+          {t("skills.card.calls")} <span className="text-text">{formatNumber(callsToday)}</span>
         </span>
         {avgLatency > 0 && (
           <span>
-            Latency: <span className="text-warning">{avgLatency}ms</span>
+            {t("skills.card.latency")} <span className="text-warning">{avgLatency}ms</span>
           </span>
         )}
       </div>

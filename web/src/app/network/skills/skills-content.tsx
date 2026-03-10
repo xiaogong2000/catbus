@@ -10,8 +10,10 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { StaggerContainer, StaggerItem } from "@/components/motion/animate-in";
 import { type ApiSkill, getSkills } from "@/lib/api";
 import { Zap } from "lucide-react";
+import { useLocale } from "@/components/locale-provider";
 
 export function SkillsContent() {
+  const { t } = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -35,6 +37,11 @@ export function SkillsContent() {
     return ["All", ...Array.from(cats).sort()];
   }, [skills]);
 
+  const allLabel = t("skills.tag.all");
+  const displayCategories = useMemo(() => {
+    return [allLabel, ...categories.slice(1)];
+  }, [categories, allLabel]);
+
   const updateParams = useCallback(
     (newCategory: string, newQuery: string) => {
       const params = new URLSearchParams();
@@ -47,8 +54,13 @@ export function SkillsContent() {
   );
 
   const handleCategory = useCallback(
-    (c: string) => { setCategory(c); updateParams(c, query); },
-    [query, updateParams],
+    (c: string) => {
+      // Map translated "All" label back to internal "All" value
+      const internal = c === allLabel ? "All" : c;
+      setCategory(internal);
+      updateParams(internal, query);
+    },
+    [query, updateParams, allLabel],
   );
 
   const handleSearch = useCallback(
@@ -84,29 +96,29 @@ export function SkillsContent() {
   return (
     <>
       <div className="mb-6">
-        <SearchBar placeholder="Search skills..." onSearch={handleSearch} />
+        <SearchBar placeholder={t("skills.search")} onSearch={handleSearch} />
       </div>
 
       <div className="mb-8">
-        <TagFilter tags={categories} selected={category} onSelect={handleCategory} />
+        <TagFilter tags={displayCategories} selected={category === "All" ? allLabel : category} onSelect={handleCategory} />
       </div>
 
       {filtered.length === 0 ? (
         skills.length === 0 ? (
           <EmptyState
             icon={<Zap size={24} className="text-text-dim" />}
-            title="No skills registered yet"
-            description="Be the first to publish a skill on the CatBus network."
+            title={t("skills.empty.title")}
+            description={t("skills.empty.desc")}
             steps={[
-              { label: "Read the skill guide", href: "/docs" },
-              { label: "Register your agent node" },
-              { label: "Publish your first skill" },
+              { label: t("skills.empty.step1"), href: "/docs" },
+              { label: t("skills.empty.step2") },
+              { label: t("skills.empty.step3") },
             ]}
           />
         ) : (
           <EmptyState
-            title="No matching skills"
-            description="Try a different search query or category."
+            title={t("skills.noMatch.title")}
+            description={t("skills.noMatch.desc")}
           />
         )
       ) : (

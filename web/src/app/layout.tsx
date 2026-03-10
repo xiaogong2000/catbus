@@ -4,6 +4,7 @@ import { NavBar } from "@/components/layout/nav-bar";
 import { Footer } from "@/components/layout/footer";
 import { ConstellationBg } from "@/components/canvas/constellation-bg";
 import { ThemeProvider } from "@/components/theme-provider";
+import { LocaleProvider } from "@/components/locale-provider";
 import { SessionProvider } from "@/components/session-provider";
 import "./globals.css";
 
@@ -35,12 +36,17 @@ export default function RootLayout({
       >
         <SessionProvider>
           <ThemeProvider>
+            <LocaleProvider>
+            <div className="ambient-glow" aria-hidden="true" />
+            <div className="ambient-glow-center" aria-hidden="true" />
+            <div className="noise-overlay" aria-hidden="true" />
             <ConstellationBg />
             <NavBar />
             <main className="max-w-[1200px] mx-auto px-6">
               {children}
             </main>
             <Footer />
+            </LocaleProvider>
           </ThemeProvider>
         </SessionProvider>
       </body>

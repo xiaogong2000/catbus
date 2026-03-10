@@ -8,73 +8,50 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-
-type Theme = "light" | "dark" | "system";
+import { colorThemes, getThemeById, type ColorTheme } from "@/lib/color-themes";
 
 interface ThemeContext {
-  theme: Theme;
-  resolved: "light" | "dark";
-  setTheme: (t: Theme) => void;
+  colorTheme: string;
+  setColorTheme: (id: string) => void;
+  themes: ColorTheme[];
 }
 
 const Ctx = createContext<ThemeContext>({
-  theme: "dark",
-  resolved: "dark",
-  setTheme: () => {},
+  colorTheme: "evolution",
+  setColorTheme: () => {},
+  themes: colorThemes,
 });
 
 export const useTheme = () => useContext(Ctx);
 
-function getSystemTheme(): "light" | "dark" {
-  if (typeof window === "undefined") return "dark";
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
-}
-
-function resolve(theme: Theme): "light" | "dark" {
-  return theme === "system" ? getSystemTheme() : theme;
+function applyColorTheme(id: string) {
+  const theme = getThemeById(id);
+  const root = document.documentElement;
+  // Always dark
+  root.classList.add("dark");
+  // Apply theme CSS variables
+  for (const [key, value] of Object.entries(theme.vars)) {
+    root.style.setProperty(key, value);
+  }
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark");
-  const [resolved, setResolved] = useState<"light" | "dark">("dark");
+  const [colorTheme, setColorThemeState] = useState("evolution");
 
-  // Read saved preference on mount
   useEffect(() => {
-    const saved = localStorage.getItem("catbus-theme") as Theme | null;
-    const t = saved ?? "dark";
-    setThemeState(t);
-    setResolved(resolve(t));
+    const saved = localStorage.getItem("catbus-color-theme") || "evolution";
+    setColorThemeState(saved);
+    applyColorTheme(saved);
   }, []);
 
-  // Apply class to <html>
-  useEffect(() => {
-    const root = document.documentElement;
-    if (resolved === "dark") {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
-  }, [resolved]);
-
-  // Listen to system theme changes when in "system" mode
-  useEffect(() => {
-    if (theme !== "system") return;
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = () => setResolved(getSystemTheme());
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, [theme]);
-
-  const setTheme = useCallback((t: Theme) => {
-    setThemeState(t);
-    setResolved(resolve(t));
-    localStorage.setItem("catbus-theme", t);
+  const setColorTheme = useCallback((id: string) => {
+    setColorThemeState(id);
+    applyColorTheme(id);
+    localStorage.setItem("catbus-color-theme", id);
   }, []);
 
   return (
-    <Ctx.Provider value={{ theme, resolved, setTheme }}>
+    <Ctx.Provider value={{ colorTheme, setColorTheme, themes: colorThemes }}>
       {children}
     </Ctx.Provider>
   );
