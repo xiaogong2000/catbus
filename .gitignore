@@ -7,3 +7,8 @@ build/
 venv/
 *.log
 *.err
+
+# Web frontend
+web/node_modules/
+web/.next/
+web/.env*

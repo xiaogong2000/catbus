@@ -1,0 +1,152 @@
+@import "tailwindcss";
+
+@config "../../tailwind.config.ts";
+
+:root {
+  /* -- Background layers (light) -- */
+  --c-bg:           0 0% 100%;
+  --c-bg-subtle:    0 0% 97%;
+  --c-bg-elevated:  0 0% 94%;
+
+  /* -- Borders (light) -- */
+  --c-border:       0 0% 85%;
+  --c-border-hover: 0 0% 70%;
+
+  /* -- Text (light) -- */
+  --c-text:         0 0% 9%;
+  --c-text-dim:     0 0% 40%;
+  --c-text-muted:   0 0% 55%;
+
+  /* -- Semantic colors -- */
+  --c-primary:      220 100% 50%;
+  --c-primary-fg:   0 0% 100%;
+  --c-success:      150 100% 30%;
+  --c-warning:      35 100% 45%;
+  --c-danger:       0 100% 55%;
+
+  /* -- Overlay -- */
+  --c-overlay:      hsl(0 0% 0% / 0.4);
+
+  /* -- Particle color for constellation -- */
+  --c-particle:     220 30% 75%;
+  --c-particle-alpha: 0.12;
+
+  /* -- Chart palette (8 colors) -- */
+  --c-chart-1: hsl(239 84% 67%);
+  --c-chart-2: hsl(187 85% 53%);
+  --c-chart-3: hsl(142 71% 45%);
+  --c-chart-4: hsl(38 92% 50%);
+  --c-chart-5: hsl(0 84% 60%);
+  --c-chart-6: hsl(258 90% 66%);
+  --c-chart-7: hsl(330 81% 60%);
+  --c-chart-8: hsl(168 76% 42%);
+
+  /* -- Font families -- */
+  --font-ui:   "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+
+  /* -- Font sizes -- */
+  --text-xs:   12px;
+  --text-sm:   13px;
+  --text-base: 14px;
+  --text-md:   16px;
+  --text-lg:   18px;
+  --text-xl:   20px;
+  --text-2xl:  24px;
+  --text-3xl:  30px;
+  --text-hero: 60px;
+
+  /* -- Spacing -- */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  24px;
+  --space-6:  32px;
+  --space-8:  48px;
+  --space-10: 64px;
+  --space-12: 96px;
+
+  /* -- Border radius -- */
+  --radius-sm:   4px;
+  --radius-md:   6px;
+  --radius-lg:   8px;
+  --radius-xl:   12px;
+  --radius-full: 9999px;
+
+  /* -- Glass -- */
+  --glass-bg:      0 0% 100% / 0.55;
+  --glass-border:  0 0% 100% / 0.25;
+  --glass-shine:   0 0% 100% / 0.12;
+  --glass-blur:    20px;
+
+  /* -- Shadows (light) -- */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -1px rgba(0,0,0,0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+
+  /* -- Motion -- */
+  --motion-base:   0.2s;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring:   cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.dark {
+  --c-bg:           0 0% 0%;
+  --c-bg-subtle:    0 0% 3%;
+  --c-bg-elevated:  0 0% 6%;
+  --c-border:       0 0% 12%;
+  --c-border-hover: 0 0% 20%;
+  --c-text:         0 0% 93%;
+  --c-text-dim:     0 0% 60%;
+  --c-text-muted:   0 0% 50%;
+  --c-primary:      220 100% 60%;
+  --c-success:      150 100% 35%;
+  --c-warning:      35 100% 50%;
+  --c-danger:       0 100% 60%;
+  --c-overlay:      hsl(0 0% 0% / 0.8);
+  --c-particle:     0 0% 100%;
+  --c-particle-alpha: 0.3;
+  --glass-bg:      0 0% 100% / 0.06;
+  --glass-border:  0 0% 100% / 0.08;
+  --glass-shine:   0 0% 100% / 0.04;
+  --glass-blur:    24px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4), 0 2px 4px -1px rgba(0,0,0,0.2);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.5), 0 4px 6px -2px rgba(0,0,0,0.3);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+body {
+  background: hsl(var(--c-bg));
+  color: hsl(var(--c-text));
+  font-family: var(--font-ui);
+}
+
+/* -- Glass effect -- */
+.glass {
+  background: hsl(var(--glass-bg));
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid hsl(var(--glass-border));
+  box-shadow:
+    var(--shadow-sm),
+    inset 0 1px 0 0 hsl(var(--glass-shine));
+}
+
+.glass-subtle {
+  background: hsl(var(--glass-bg));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
