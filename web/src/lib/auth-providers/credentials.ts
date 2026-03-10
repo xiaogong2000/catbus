@@ -1,4 +1,6 @@
 import CredentialsProvider from "next-auth/providers/credentials";
+import bcrypt from "bcryptjs";
+import { findUserByEmail } from "@/lib/db";
 
 export const credentialsProvider = CredentialsProvider({
   name: "Email",
@@ -11,18 +13,16 @@ export const credentialsProvider = CredentialsProvider({
       return null;
     }
 
-    // Mock verification — replace with real DB lookup
-    if (
-      credentials.email === "demo@catbus.ai" &&
-      credentials.password === "Demo1234"
-    ) {
-      return {
-        id: "mock-credentials-user-1",
-        email: credentials.email,
-        name: "Demo User",
-      };
-    }
+    const user = findUserByEmail(credentials.email);
+    if (!user) return null;
 
-    return null;
+    const valid = await bcrypt.compare(credentials.password, user.password_hash);
+    if (!valid) return null;
+
+    return {
+      id: String(user.id),
+      email: user.email,
+      name: user.name || user.email.split("@")[0],
+    };
   },
 });

@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { LoginRegion } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ function validatePassword(pw: string): string | null {
 }
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [region, setRegion] = useState<LoginRegion>("international");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -53,20 +55,33 @@ export default function RegisterPage() {
       setError("");
       setLoading(true);
       try {
-        // TODO: call register API first, then sign in
+        const regRes = await fetch("/api/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+
+        if (!regRes.ok) {
+          const data = await regRes.json();
+          setError(data.error || "Registration failed. Please try again.");
+          return;
+        }
+
         const res = await signIn("credentials", {
           email,
           password,
           redirect: false,
         });
         if (res?.error) {
-          setError("Registration failed. Please try again.");
+          setError("Account created but login failed. Try signing in.");
+        } else {
+          router.push("/dashboard");
         }
       } finally {
         setLoading(false);
       }
     },
-    [email, password, emailError, passwordError, confirmError]
+    [email, password, emailError, passwordError, confirmError, router]
   );
 
   const fieldError = (msg: string | null) =>

@@ -5,8 +5,13 @@ import { PageHeader } from "@/components/layout/page-header";
 import { StatsRow } from "@/components/data-display/stats-row";
 import { DataTable } from "@/components/data-display/data-table";
 import { ActivityFeed } from "@/components/data-display/activity-feed";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { AnimateIn } from "@/components/motion/animate-in";
+import { PageTransition } from "@/components/motion/page-transition";
 import { type NetworkStats, type ApiSkill, getStats, getSkills } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
+import { Globe } from "lucide-react";
 
 const columns = [
   { key: "name", label: "Skill", sortable: true },
@@ -25,62 +30,75 @@ const columns = [
 export default function NetworkPage() {
   const [stats, setStats] = useState<NetworkStats | null>(null);
   const [skills, setSkills] = useState<ApiSkill[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getStats().then(setStats).catch(() => {});
-    getSkills(1, 10).then((res) => setSkills(res.data)).catch(() => {});
+    Promise.all([
+      getStats().then(setStats),
+      getSkills(1, 10).then((res) => setSkills(res.data)),
+    ])
+      .catch((err) => console.error("Failed to fetch network data:", err))
+      .finally(() => setLoading(false));
   }, []);
 
   return (
-    <div className="py-10">
-      <PageHeader
-        eyebrow="NETWORK"
-        title="Network Overview"
-        description="Real-time health and activity of the CatBus network."
-      />
+    <PageTransition>
+      <div className="py-10">
+        <PageHeader
+          eyebrow="NETWORK"
+          title="Network Overview"
+          description="Real-time health and activity of the CatBus network."
+        />
 
-      <StatsRow
-        items={[
-          {
-            label: "Nodes Online",
-            value: stats ? String(stats.online_nodes) : "—",
-            description: "Active nodes on the network",
-            color: "success",
-          },
-          {
-            label: "Skills Available",
-            value: stats ? String(stats.total_skills) : "—",
-            description: "Unique skills registered",
-          },
-          {
-            label: "Calls Today",
-            value: stats ? formatNumber(stats.calls_today) : "—",
-            description: "Total skill invocations",
-            color: "warning",
-          },
-          {
-            label: "Avg Response",
-            value: stats ? `${Math.round(stats.avg_latency_ms)}ms` : "—",
-            description: "Median response time",
-            color: "success",
-          },
-        ]}
-      />
-
-      <div className="mb-10">
-        <h2 className="text-[24px] font-bold tracking-[-0.6px] text-text mb-4">
-          Top Skills
-        </h2>
-        {skills.length === 0 ? (
-          <p className="text-[14px] text-text-muted py-8 text-center">
-            No skills registered yet. Connect an agent to get started.
-          </p>
+        {loading ? (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} height={100} />
+            ))}
+          </div>
         ) : (
-          <DataTable columns={columns} data={skills as unknown as Record<string, unknown>[]} />
+          <StatsRow
+            items={[
+              { label: "Nodes Online", value: String(stats?.online_nodes ?? 0), description: "Active nodes on the network", color: "success" },
+              { label: "Skills Available", value: String(stats?.total_skills ?? 0), description: "Unique skills registered" },
+              { label: "Calls Today", value: stats ? formatNumber(stats.calls_today) : "0", description: "Total skill invocations", color: "warning" },
+              { label: "Avg Response", value: stats ? `${Math.round(stats.avg_latency_ms)}ms` : "0ms", description: "Median response time", color: "success" },
+            ]}
+          />
         )}
-      </div>
 
-      <ActivityFeed items={[]} />
-    </div>
+        <AnimateIn>
+          <div className="mb-10">
+            <h2 className="text-[24px] font-bold tracking-[-0.6px] text-text mb-4">
+              Top Skills
+            </h2>
+            {loading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} height={48} />
+                ))}
+              </div>
+            ) : skills.length === 0 ? (
+              <EmptyState
+                icon={<Globe size={24} className="text-text-dim" />}
+                title="No skills registered yet"
+                description="Connect an agent to the network and publish your first skill."
+                steps={[
+                  { label: "Install the CatBus SDK", href: "/docs" },
+                  { label: "Register your agent node" },
+                  { label: "Publish your first skill" },
+                ]}
+              />
+            ) : (
+              <DataTable columns={columns} data={skills as unknown as Record<string, unknown>[]} />
+            )}
+          </div>
+        </AnimateIn>
+
+        <AnimateIn>
+          <ActivityFeed items={[]} />
+        </AnimateIn>
+      </div>
+    </PageTransition>
   );
 }
