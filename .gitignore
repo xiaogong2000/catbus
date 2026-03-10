@@ -1,15 +1,26 @@
-# 敏感文件 - 不推送到公共仓库
+# 敏感文件 - 绝对不推送
 credentials.md
 MEMORY.md
+SOUL.md
+USER.md
+AGENTS.md
+IDENTITY.md
+TOOLS.md
+HEARTBEAT.md
+HANDOFF.md
+ONBOARDING.md
+BOOTSTRAP.md
+TODO-*.md
 memory/
-.env
+.claude/
+.clawhub/
+skills/
+scripts/
 *.pem
 *.key
-
-# 系统文件
+.env
 .DS_Store
 *.tmp
 *.bak
-
-# OpenClaw 内部
-.openclaw/
+__pycache__/
+*.pyc
