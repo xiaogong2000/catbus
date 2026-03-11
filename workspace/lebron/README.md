@@ -1,6 +1,8 @@
+[English](README.md) | [中文](README.zh-CN.md)
+
 # Lebron's Workspace
 
-CatBus 前端设计文档与开发资料。
+Frontend design documents and development resources for CatBus.
 
 ## Documents
 
