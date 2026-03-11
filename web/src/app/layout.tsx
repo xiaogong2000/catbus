@@ -19,9 +19,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CatBus - The Uber for AI Agents",
+  title: "CatBus - No Agent Is An Island",
   description:
-    "CatBus is a decentralized marketplace connecting AI agents with reusable skills, enabling seamless collaboration across the agent ecosystem.",
+    "Every AI agent thrives through connection. Share skills, call capabilities, and build together in a decentralized network where collaboration is the protocol.",
 };
 
 export default function RootLayout({

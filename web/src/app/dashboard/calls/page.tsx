@@ -1,63 +1,85 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { callHistory, relativeTime } from "@/lib/mock-data-dashboard";
+import { Skeleton } from "@/components/ui/skeleton";
+import { relativeTime } from "@/lib/mock-data-dashboard";
+import type { CallRecord } from "@/lib/mock-data-dashboard";
+import { fetchCalls } from "@/lib/dashboard-api";
 import { cn } from "@/lib/utils";
 import { thClass, tdBaseClass, trHoverClass } from "@/lib/table-styles";
 import { ArrowDownLeft, ArrowUpRight, Search } from "lucide-react";
+import { useLocale } from "@/components/locale-provider";
 
 const DIRECTIONS = ["all", "inbound", "outbound"] as const;
 const STATUSES = ["all", "success", "error", "timeout"] as const;
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 20;
+
+const directionKeys: Record<string, string> = {
+  all: "dash.calls.all",
+  inbound: "dash.calls.inbound",
+  outbound: "dash.calls.outbound",
+};
+
+const statusKeys: Record<string, string> = {
+  all: "dash.calls.all",
+  success: "dash.calls.success",
+  error: "dash.calls.error",
+  timeout: "dash.calls.timeout",
+};
 
 export default function CallsPage() {
+  const { t } = useLocale();
   const [direction, setDirection] = useState<string>("all");
   const [status, setStatus] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [calls, setCalls] = useState<CallRecord[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = useMemo(() => {
-    let result = callHistory;
-    if (direction !== "all") {
-      result = result.filter((c) => c.direction === direction);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetchCalls({
+        page,
+        limit: PAGE_SIZE,
+        direction: direction !== "all" ? direction : undefined,
+        status: status !== "all" ? status : undefined,
+        skill: search.trim() || undefined,
+      });
+      setCalls(res.data);
+      setTotal(res.total);
+    } catch (err) {
+      console.error("Failed to fetch calls:", err);
+    } finally {
+      setLoading(false);
     }
-    if (status !== "all") {
-      result = result.filter((c) => c.status === status);
-    }
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        (c) =>
-          c.skill.toLowerCase().includes(q) ||
-          c.remote_node.toLowerCase().includes(q) ||
-          c.agent_name.toLowerCase().includes(q),
-      );
-    }
-    return result;
-  }, [direction, status, search]);
+  }, [page, direction, status, search]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <>
       <PageHeader
-        eyebrow="Dashboard"
-        title="Call History"
-        description="View and filter all inbound and outbound calls."
+        eyebrow={t("dash.eyebrow")}
+        title={t("dash.calls.title")}
+        description={t("dash.calls.desc")}
       />
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-6">
         <Input
           icon={<Search size={16} />}
-          placeholder="Search by skill, node, agent..."
+          placeholder={t("dash.calls.searchPlaceholder")}
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -78,7 +100,7 @@ export default function CallsPage() {
                 setPage(1);
               }}
             >
-              {d === "all" ? "All" : d === "inbound" ? "Inbound" : "Outbound"}
+              {t(directionKeys[d])}
             </Button>
           ))}
         </div>
@@ -95,33 +117,36 @@ export default function CallsPage() {
                 setPage(1);
               }}
             >
-              {s.charAt(0).toUpperCase() + s.slice(1)}
+              {t(statusKeys[s])}
             </Button>
           ))}
         </div>
       </div>
 
       {/* Table */}
-      {paged.length > 0 ? (
+      {loading ? (
+        <Card className="py-8">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} variant="text" width="100%" height={16} className="mb-2" />
+          ))}
+        </Card>
+      ) : calls.length > 0 ? (
         <div className="border border-border rounded-lg overflow-hidden mb-4">
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                <th className={thClass}>Time</th>
-                <th className={thClass}>Direction</th>
-                <th className={thClass}>Skill</th>
-                <th className={thClass}>Remote</th>
-                <th className={thClass}>Agent</th>
-                <th className={thClass}>Latency</th>
-                <th className={thClass}>Status</th>
+                <th className={thClass}>{t("dash.table.time")}</th>
+                <th className={thClass}>{t("dash.table.direction")}</th>
+                <th className={thClass}>{t("dash.table.skill")}</th>
+                <th className={thClass}>{t("dash.table.remote")}</th>
+                <th className={thClass}>{t("dash.table.agent")}</th>
+                <th className={thClass}>{t("dash.table.latency")}</th>
+                <th className={thClass}>{t("dash.table.status")}</th>
               </tr>
             </thead>
             <tbody>
-              {paged.map((call) => (
-                <tr
-                  key={call.id}
-                  className={trHoverClass}
-                >
+              {calls.map((call) => (
+                <tr key={call.id} className={trHoverClass}>
                   <td className={cn(tdBaseClass, "text-text-dim whitespace-nowrap")}>
                     {relativeTime(call.timestamp)}
                   </td>
@@ -132,7 +157,7 @@ export default function CallsPage() {
                       ) : (
                         <ArrowUpRight size={14} className="text-warning" />
                       )}
-                      {call.direction === "inbound" ? "In" : "Out"}
+                      {call.direction === "inbound" ? t("dash.table.in") : t("dash.table.out")}
                     </span>
                   </td>
                   <td className={cn(tdBaseClass, "text-text font-mono")}>
@@ -167,7 +192,7 @@ export default function CallsPage() {
       ) : (
         <Card hoverable={false} className="py-12 text-center mb-4">
           <p className="text-[14px] text-text-dim">
-            No calls match your filters.
+            {t("dash.calls.noMatch")}
           </p>
         </Card>
       )}
@@ -175,24 +200,24 @@ export default function CallsPage() {
       {/* Pagination */}
       <div className="flex items-center justify-between">
         <p className="text-[13px] text-text-muted">
-          Showing {paged.length} / {filtered.length}
+          {t("dash.calls.showing")} {calls.length} / {total}
         </p>
         <div className="flex gap-2">
           <Button
             variant="primary"
             size="sm"
-            disabled={safePage <= 1}
+            disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
-            Previous
+            {t("dash.calls.previous")}
           </Button>
           <Button
             variant="primary"
             size="sm"
-            disabled={safePage >= totalPages}
+            disabled={page >= totalPages}
             onClick={() => setPage((p) => p + 1)}
           >
-            Next
+            {t("dash.calls.next")}
           </Button>
         </div>
       </div>

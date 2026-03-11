@@ -21,9 +21,9 @@ const sizeStyles: Record<string, string> = {
 };
 
 const tagSizeStyles: Record<string, string> = {
-  sm: "px-2 py-0.5 text-[11px]",
-  md: "px-3 py-1 text-[12px]",
-  lg: "px-4 py-1.5 text-[13px]",
+  sm: "min-w-[3.5rem] px-2 py-0.5 text-[11px]",
+  md: "min-w-[4.5rem] px-3 py-1 text-[12px]",
+  lg: "min-w-[5.5rem] px-4 py-1.5 text-[13px]",
 };
 
 export function Button({

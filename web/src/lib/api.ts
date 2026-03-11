@@ -22,10 +22,39 @@ export interface ApiSkill {
   name: string;
   description: string;
   providers: number;
-  calls_today: number;
+}
+
+export interface ApiSkillDetail {
+  name: string;
+  description: string;
+  input_schema: Record<string, string>;
+  providers: { node_id: string; name: string }[];
+  calls_total: number;
   avg_latency_ms: number;
-  category: string;
-  status: "online" | "offline";
+}
+
+export interface ApiNodeCall {
+  id: string;
+  timestamp: string;
+  direction: "inbound" | "outbound";
+  skill: string;
+  remote_node: string;
+  latency_ms: number;
+  status: "success" | "error" | "timeout";
+  relay: string;
+}
+
+export interface ApiNodeCallsSummary {
+  total_handled: number;
+  total_made: number;
+  success_rate: number;
+  avg_latency: number;
+}
+
+export interface ApiNodeDailyStat {
+  date: string;
+  inbound: number;
+  outbound: number;
 }
 
 interface Paginated<T> {
@@ -57,6 +86,31 @@ export async function getNodeById(nodeId: string): Promise<ApiNode> {
   return fetchApi<ApiNode>(`/nodes/${nodeId}`);
 }
 
-export async function getSkillByName(name: string): Promise<ApiSkill> {
-  return fetchApi<ApiSkill>(`/skills/${name}`);
+export async function getSkillByName(name: string): Promise<ApiSkillDetail> {
+  return fetchApi<ApiSkillDetail>(`/skills/${name}`);
+}
+
+export async function getNodeCalls(
+  nodeId: string,
+  params: { page?: number; limit?: number; direction?: string; status?: string; skill?: string } = {},
+): Promise<Paginated<ApiNodeCall>> {
+  const qs = new URLSearchParams();
+  if (params.page) qs.set("page", String(params.page));
+  if (params.limit) qs.set("limit", String(params.limit));
+  if (params.direction) qs.set("direction", params.direction);
+  if (params.status) qs.set("status", params.status);
+  if (params.skill) qs.set("skill", params.skill);
+  return fetchApi<Paginated<ApiNodeCall>>(`/nodes/${nodeId}/calls?${qs.toString()}`);
+}
+
+export async function getNodeCallsSummary(nodeId: string): Promise<ApiNodeCallsSummary> {
+  return fetchApi<ApiNodeCallsSummary>(`/nodes/${nodeId}/calls/summary`);
+}
+
+export async function getNodeDailyStats(nodeId: string, days = 7): Promise<ApiNodeDailyStat[]> {
+  return fetchApi<ApiNodeDailyStat[]>(`/nodes/${nodeId}/stats/daily?days=${days}`);
+}
+
+export async function getHealthCheck(): Promise<{ ok: boolean; version: string; uptime_seconds: number }> {
+  return fetchApi("/health");
 }

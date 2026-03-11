@@ -9,6 +9,7 @@ import { PageTransition } from "@/components/motion/page-transition";
 import { type NetworkStats, getStats } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { useLocale } from "@/components/locale-provider";
+import { ArrowRight, Shield, Star, ClipboardList } from "lucide-react";
 import Link from "next/link";
 
 
@@ -49,58 +50,66 @@ export default function Home() {
   }, []);
 
   const gettingStartedCards = [
-    { titleKey: "home.card.connect", descKey: "home.card.connectDesc", accent: "primary" as const },
-    { titleKey: "home.card.guides", descKey: "home.card.guidesDesc", accent: undefined },
-    { titleKey: "home.card.community", descKey: "home.card.communityDesc", accent: undefined },
-    { titleKey: "home.card.marketplace", descKey: "home.card.marketplaceDesc", accent: "warning" as const },
+    { titleKey: "home.card.connect", descKey: "home.card.connectDesc", icon: "🔗", accent: "hsl(220 100% 60%)", href: "/dashboard/agents" },
+    { titleKey: "home.card.guides", descKey: "home.card.guidesDesc", icon: "📖", accent: "hsl(260 80% 60%)", href: "/docs" },
+    { titleKey: "home.card.community", descKey: "home.card.communityDesc", icon: "💬", accent: "hsl(150 100% 35%)", href: "https://github.com/xiaogong2000/catbus", external: true },
+    { titleKey: "home.card.marketplace", descKey: "home.card.marketplaceDesc", icon: "🏪", accent: "hsl(35 100% 50%)", href: "/network/skills" },
   ];
 
   const trustCards = [
-    { step: "01", titleKey: "home.trust.schema", descKey: "home.trust.schemaDesc", accent: "primary" as const },
-    { step: "02", titleKey: "home.trust.reputation", descKey: "home.trust.reputationDesc", accent: undefined },
-    { step: "03", titleKey: "home.trust.audit", descKey: "home.trust.auditDesc", accent: "success" as const },
+    { step: "01", titleKey: "home.trust.schema", descKey: "home.trust.schemaDesc", accent: "hsl(220 100% 60%)", Icon: Shield },
+    { step: "02", titleKey: "home.trust.reputation", descKey: "home.trust.reputationDesc", accent: "hsl(260 80% 60%)", Icon: Star },
+    { step: "03", titleKey: "home.trust.audit", descKey: "home.trust.auditDesc", accent: "hsl(150 100% 35%)", Icon: ClipboardList },
   ];
 
   const bioCards = [
-    { titleKey: "home.bio.symbiosis", descKey: "home.bio.symbiosisDesc", accent: undefined },
-    { titleKey: "home.bio.evolution", descKey: "home.bio.evolutionDesc", accent: "success" as const },
-    { titleKey: "home.bio.resilience", descKey: "home.bio.resilienceDesc", accent: undefined },
+    { titleKey: "home.bio.symbiosis", descKey: "home.bio.symbiosisDesc", tag: "🧬 Symbiosis", accent: "hsl(220 100% 60%)" },
+    { titleKey: "home.bio.evolution", descKey: "home.bio.evolutionDesc", tag: "🧪 Evolution", accent: "hsl(150 100% 35%)" },
+    { titleKey: "home.bio.resilience", descKey: "home.bio.resilienceDesc", tag: "🔄 Resilience", accent: "hsl(35 100% 50%)" },
   ];
 
   return (
     <PageTransition>
       <div className="py-10">
         {/* Hero Section */}
-        <section className="flex flex-col lg:flex-row gap-10 mb-16">
-          <div className="lg:w-2/3">
+        <section className="relative flex flex-col lg:flex-row gap-12 mb-20 pt-6">
+          <div className="hero-spotlight" />
+          <div className="relative z-10 lg:w-2/3">
             <AnimateIn>
-              <h1 className="text-[60px] font-bold leading-[1] tracking-[-1.5px] text-text mb-6">
+              <h1 className="hero-gradient-text text-[64px] font-bold leading-[1.05] tracking-[-2px] mb-8">
                 {t("home.hero.title")}
               </h1>
             </AnimateIn>
             <AnimateIn delay={0.1}>
-              <p className="text-[16px] text-text-dim max-w-[540px] mb-8 leading-[1.5]">
+              <p className="text-[17px] text-text-dim max-w-[520px] mb-10 leading-[1.65]">
                 {t("home.hero.desc")}
               </p>
             </AnimateIn>
             <AnimateIn delay={0.2}>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap items-center gap-4">
                 <Link href="/docs">
-                  <Button variant="primary" size="lg">{t("home.hero.askCatBus")}</Button>
+                  <button className="btn-glow inline-flex items-center justify-center h-12 px-8 rounded-lg text-[15px] font-semibold cursor-pointer">
+                    {t("home.hero.askCatBus")}
+                  </button>
                 </Link>
                 <Link href="/network/skills">
                   <Button variant="primary" size="lg">{t("home.hero.browseMarket")}</Button>
                 </Link>
-                <a href="https://github.com/xiaogong2000/catbus" target="_blank" rel="noopener noreferrer">
-                  <Button variant="ghost" size="lg">{t("home.hero.githubStar")}</Button>
+                <a
+                  href="https://github.com/xiaogong2000/catbus"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[14px] text-text-muted hover:text-text transition-colors duration-200"
+                >
+                  {t("home.hero.githubStar")} &rarr;
                 </a>
               </div>
             </AnimateIn>
           </div>
 
-          <AnimateIn delay={0.15} className="lg:w-1/3">
-            <div className="glass rounded-lg p-4 font-mono text-[13px]">
-              <div className="flex items-center justify-between mb-3">
+          <AnimateIn delay={0.15} className="relative z-10 lg:w-1/3">
+            <div className="glass rounded-xl p-5 font-mono text-[13px]">
+              <div className="flex items-center justify-between mb-4">
                 <span className="text-[11px] text-text-muted uppercase tracking-[0.6px]">
                   {t("home.quickStart")}
                 </span>
@@ -110,14 +119,14 @@ export default function Home() {
                   <span className="w-2.5 h-2.5 rounded-full bg-success/60" />
                 </div>
               </div>
-              <pre className="text-text-dim leading-[1.6] overflow-x-auto">
+              <pre className="text-text-dim leading-[1.7] overflow-x-auto">
                 <code>
 {`$ pip install catbus
 $ catbus init
 $ catbus serve`}
                 </code>
               </pre>
-              <div className="mt-4 space-y-2 text-[13px]">
+              <div className="mt-4 pt-4 border-t border-[hsl(var(--glass-border))] space-y-2.5 text-[13px]">
                 <p className="text-text-dim">
                   <span className="text-success font-semibold">1.</span> {t("home.step1")}
                 </p>
@@ -178,10 +187,26 @@ $ catbus serve`}
           <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {gettingStartedCards.map((item) => (
               <StaggerItem key={item.titleKey}>
-                <Card glass accent={item.accent}>
-                  <h3 className="text-[16px] font-semibold text-text mb-2">{t(item.titleKey)}</h3>
-                  <p className="text-[14px] text-text-dim leading-[1.5]">{t(item.descKey)}</p>
-                </Card>
+                <Link
+                  href={item.href}
+                  {...(item.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                  className="block h-full"
+                >
+                  <div
+                    className="relative h-full rounded-xl bg-bg-elevated border border-border p-6 pb-10 transition-all duration-300 hover:-translate-y-0.5 hover:border-border-hover group"
+                    style={{ borderTopColor: item.accent, borderTopWidth: 2 }}
+                  >
+                    <div
+                      className="w-11 h-11 rounded-[10px] flex items-center justify-center text-[22px] mb-4"
+                      style={{ background: `${item.accent.replace(")", " / 0.15)")}` }}
+                    >
+                      {item.icon}
+                    </div>
+                    <h3 className="text-[16px] font-semibold text-text mb-2">{t(item.titleKey)}</h3>
+                    <p className="text-[13px] text-text-dim leading-[1.55]">{t(item.descKey)}</p>
+                    <ArrowRight size={16} className="absolute bottom-5 right-5 text-text-muted group-hover:text-text group-hover:translate-x-0.5 transition-all duration-200" />
+                  </div>
+                </Link>
               </StaggerItem>
             ))}
           </StaggerContainer>
@@ -235,11 +260,27 @@ $ catbus serve`}
           <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {trustCards.map((item) => (
               <StaggerItem key={item.step}>
-                <Card className="bg-bg-elevated" accent={item.accent}>
-                  <span className="text-[12px] text-text-muted font-mono">{item.step}</span>
-                  <h3 className="text-[16px] font-semibold text-text mt-2 mb-2">{t(item.titleKey)}</h3>
-                  <p className="text-[14px] text-text-dim leading-[1.5]">{t(item.descKey)}</p>
-                </Card>
+                <div
+                  className="rounded-xl bg-bg-elevated border border-border p-6 flex items-start gap-4 transition-all duration-300 hover:-translate-y-0.5 h-full"
+                  style={{ borderLeftColor: item.accent, borderLeftWidth: 3 }}
+                >
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+                    style={{
+                      background: `${item.accent.replace(")", " / 0.08)")}`,
+                      border: `1px solid ${item.accent.replace(")", " / 0.2)")}`,
+                    }}
+                  >
+                    <item.Icon size={18} style={{ color: item.accent }} />
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-bold font-mono tracking-[1px] mb-1.5 block" style={{ color: item.accent }}>
+                      STEP {item.step}
+                    </span>
+                    <h3 className="text-[16px] font-semibold text-text mb-2">{t(item.titleKey)}</h3>
+                    <p className="text-[13px] text-text-dim leading-[1.55]">{t(item.descKey)}</p>
+                  </div>
+                </div>
               </StaggerItem>
             ))}
           </StaggerContainer>
@@ -261,10 +302,26 @@ $ catbus serve`}
           <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {bioCards.map((item) => (
               <StaggerItem key={item.titleKey}>
-                <Card glass accent={item.accent}>
-                  <h3 className="text-[16px] font-semibold text-text mb-2">{t(item.titleKey)}</h3>
-                  <p className="text-[14px] text-text-dim leading-[1.5]">{t(item.descKey)}</p>
-                </Card>
+                <div className="relative rounded-xl bg-bg-elevated border border-border p-7 pt-5 transition-all duration-300 hover:-translate-y-0.5 h-full overflow-hidden">
+                  <div
+                    className="absolute top-0 left-6 w-10 h-[3px] rounded-b-sm"
+                    style={{ background: item.accent }}
+                  />
+                  <h3
+                    className="text-[22px] font-bold mt-2 mb-2"
+                    style={{
+                      background: `linear-gradient(135deg, #fff, ${item.accent})`,
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                    }}
+                  >
+                    {t(item.titleKey)}
+                  </h3>
+                  <p className="text-[13px] text-text-dim leading-[1.6]">{t(item.descKey)}</p>
+                  <span className="inline-block mt-4 text-[11px] text-text-muted bg-bg-elevated border border-border rounded-full px-2.5 py-0.5">
+                    {item.tag}
+                  </span>
+                </div>
               </StaggerItem>
             ))}
           </StaggerContainer>

@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useState } from "react";
+import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -70,7 +71,11 @@ export default function NodesPage() {
                         onClick={() => setExpanded(expanded === node.node_id ? null : node.node_id)}
                         className="cursor-pointer hover:bg-bg-subtle transition-[background] duration-[--motion-base]"
                       >
-                        <td className={cn(tdBaseClass, "text-[14px] text-text font-medium")}>{node.name}</td>
+                        <td className={cn(tdBaseClass, "text-[14px] text-text font-medium")}>
+                          <Link href={`/network/nodes/${node.node_id}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>
+                            {node.name}
+                          </Link>
+                        </td>
                         <td className={cn(tdBaseClass, "text-[14px] text-text-dim font-mono")}>{node.node_id.slice(0, 12)}</td>
                         <td className={cn(tdBaseClass, "text-[14px] text-text")}>{node.skills.length}</td>
                         <td className={cn(tdBaseClass, "text-[14px] text-text-dim")}>{formatUptime(node.uptime_seconds)}</td>

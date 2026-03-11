@@ -3,18 +3,21 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/components/locale-provider";
 import {
   LayoutDashboard,
   Bot,
+  Briefcase,
   History,
   Settings,
 } from "lucide-react";
 
 const sidebarLinks = [
-  { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
-  { label: "My Agents", href: "/dashboard/agents", icon: Bot },
-  { label: "Call History", href: "/dashboard/calls", icon: History },
-  { label: "Settings", href: "/dashboard/settings", icon: Settings },
+  { key: "dash.sidebar.overview", href: "/dashboard", icon: LayoutDashboard },
+  { key: "dash.sidebar.agents", href: "/dashboard/agents", icon: Bot },
+  { key: "dash.sidebar.hired", href: "/dashboard/hired", icon: Briefcase },
+  { key: "dash.sidebar.calls", href: "/dashboard/calls", icon: History },
+  { key: "dash.sidebar.settings", href: "/dashboard/settings", icon: Settings },
 ];
 
 export default function DashboardLayout({
@@ -23,6 +26,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const { t } = useLocale();
 
   return (
     <div className="min-h-screen flex -mx-6">
@@ -54,7 +58,7 @@ export default function DashboardLayout({
                   )}
                 >
                   <Icon size={16} />
-                  {link.label}
+                  {t(link.key)}
                 </Link>
               );
             })}
@@ -82,7 +86,7 @@ export default function DashboardLayout({
                   isActive ? "text-text bg-bg-elevated" : "text-text-dim",
                 )}
               >
-                {link.label}
+                {t(link.key)}
               </Link>
             );
           })}

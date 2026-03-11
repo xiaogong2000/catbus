@@ -53,7 +53,7 @@ export function NavBar() {
             href="/"
             className="flex items-center gap-2 text-[16px] font-bold text-text"
           >
-            <span className="text-text">&#10022;</span>
+            <img src="/catbus-logo.jpg" alt="CatBus" className="w-7 h-7 rounded-full" />
             CatBus
           </Link>
           <div className="hidden md:flex items-center gap-1">
@@ -127,20 +127,12 @@ export function NavBar() {
             </div>
           ) : (
             /* Not logged in */
-            <>
-              <Link
-                href="/login"
-                className="hidden md:inline text-[13px] font-medium text-text-dim hover:text-text transition-[color] duration-[--motion-base]"
-              >
-                {t("nav.signIn")}
-              </Link>
-              <Link
-                href="/login"
-                className="hidden md:inline text-[13px] font-medium text-text border border-border rounded-md px-4 py-1.5 hover:border-border-hover transition-[border-color] duration-[--motion-base]"
-              >
-                {t("nav.signUp")}
-              </Link>
-            </>
+            <Link
+              href="/login"
+              className="hidden md:inline text-[13px] font-medium text-text border border-border rounded-md px-4 py-1.5 hover:border-border-hover transition-[border-color] duration-[--motion-base]"
+            >
+              {t("nav.signIn")}
+            </Link>
           )}
 
           <button
@@ -185,22 +177,13 @@ export function NavBar() {
                 </button>
               </>
             ) : (
-              <>
-                <Link
-                  href="/login"
-                  onClick={() => setMobileOpen(false)}
-                  className="block px-2 py-1.5 text-[14px] font-medium text-text-dim hover:text-text transition-[color] duration-[--motion-base]"
-                >
-                  {t("nav.signIn")}
-                </Link>
-                <Link
-                  href="/login"
-                  onClick={() => setMobileOpen(false)}
-                  className="block px-2 py-1.5 text-[14px] font-medium text-text border border-border rounded-md text-center hover:border-border-hover transition-[border-color] duration-[--motion-base]"
-                >
-                  {t("nav.signUp")}
-                </Link>
-              </>
+              <Link
+                href="/login"
+                onClick={() => setMobileOpen(false)}
+                className="block px-2 py-1.5 text-[14px] font-medium text-text border border-border rounded-md text-center hover:border-border-hover transition-[border-color] duration-[--motion-base]"
+              >
+                {t("nav.signIn")}
+              </Link>
             )}
           </div>
         </div>
