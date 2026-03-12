@@ -13,11 +13,11 @@ function validateEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-function validatePassword(pw: string): string | null {
-  if (pw.length < 8) return "Password must be at least 8 characters";
-  if (!/[a-z]/.test(pw)) return "Password must contain a lowercase letter";
-  if (!/[A-Z]/.test(pw)) return "Password must contain an uppercase letter";
-  if (!/[0-9]/.test(pw)) return "Password must contain a number";
+function validatePassword(pw: string, t: (key: string) => string): string | null {
+  if (pw.length < 8) return t("auth.validate.minLength");
+  if (!/[a-z]/.test(pw)) return t("auth.validate.lowercase");
+  if (!/[A-Z]/.test(pw)) return t("auth.validate.uppercase");
+  if (!/[0-9]/.test(pw)) return t("auth.validate.number");
   return null;
 }
 
@@ -36,13 +36,13 @@ export default function LoginPage() {
     [email, t],
   );
   const passwordError = useMemo(
-    () => (mode === "register" && password ? validatePassword(password) : null),
-    [mode, password],
+    () => (mode === "register" && password ? validatePassword(password, t) : null),
+    [mode, password, t],
   );
   const confirmError = useMemo(
     () =>
       mode === "register" && confirmPassword && confirmPassword !== password
-        ? "Passwords do not match"
+        ? t("auth.validate.mismatch")
         : null,
     [mode, password, confirmPassword],
   );

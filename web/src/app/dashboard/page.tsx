@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/layout/page-header";
+import { PageTransition } from "@/components/motion/page-transition";
 import { StatsRow } from "@/components/data-display/stats-row";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -85,7 +86,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <>
+    <PageTransition>
       <PageHeader
         eyebrow={t("dash.eyebrow")}
         title={t("dash.overview.title")}
@@ -247,6 +248,6 @@ export default function DashboardPage() {
           </Card>
         )}
       </section>
-    </>
+    </PageTransition>
   );
 }

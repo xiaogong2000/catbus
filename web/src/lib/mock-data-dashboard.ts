@@ -11,6 +11,8 @@ export interface Agent {
   calls_made: number;
   server: string;
   registered_at: string;
+  is_provider?: boolean;
+  rate_limit?: number;
 }
 
 export interface SkillSummary {
@@ -307,7 +309,8 @@ export function getCallsByAgent(agentName: string): CallRecord[] {
 }
 
 // Helper: format uptime
-export function formatUptime(seconds: number): string {
+export function formatUptime(seconds: number | null | undefined): string {
+  if (seconds == null || isNaN(seconds) || seconds <= 0) return "—";
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   if (hours > 0) return `${hours}h ${minutes}m`;

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { PageHeader } from "@/components/layout/page-header";
+import { PageTransition } from "@/components/motion/page-transition";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,7 +38,18 @@ export default function CallsPage() {
   const [direction, setDirection] = useState<string>("all");
   const [status, setStatus] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Debounce search input
+  useEffect(() => {
+    debounceRef.current = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(debounceRef.current);
+  }, [search]);
   const [calls, setCalls] = useState<CallRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -50,7 +62,7 @@ export default function CallsPage() {
         limit: PAGE_SIZE,
         direction: direction !== "all" ? direction : undefined,
         status: status !== "all" ? status : undefined,
-        skill: search.trim() || undefined,
+        skill: debouncedSearch.trim() || undefined,
       });
       setCalls(res.data);
       setTotal(res.total);
@@ -59,7 +71,7 @@ export default function CallsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, direction, status, search]);
+  }, [page, direction, status, debouncedSearch]);
 
   useEffect(() => {
     load();
@@ -68,7 +80,7 @@ export default function CallsPage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <>
+    <PageTransition>
       <PageHeader
         eyebrow={t("dash.eyebrow")}
         title={t("dash.calls.title")}
@@ -81,10 +93,7 @@ export default function CallsPage() {
           icon={<Search size={16} />}
           placeholder={t("dash.calls.searchPlaceholder")}
           value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
+          onChange={(e) => setSearch(e.target.value)}
           className="w-64"
         />
 
@@ -221,6 +230,6 @@ export default function CallsPage() {
           </Button>
         </div>
       </div>
-    </>
+    </PageTransition>
   );
 }

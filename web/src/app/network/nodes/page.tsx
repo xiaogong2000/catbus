@@ -59,7 +59,7 @@ export default function NodesPage() {
               <table className="w-full border-collapse">
                 <thead>
                   <tr>
-                    {[t("nodes.table.name"), t("nodes.table.nodeId"), t("nodes.table.skills"), t("nodes.table.uptime"), t("nodes.table.status")].map((h) => (
+                    {[t("nodes.table.name"), t("nodes.table.id"), t("nodes.table.skills"), t("nodes.table.uptime"), t("nodes.table.status")].map((h) => (
                       <th key={h} className={thClass}>{h}</th>
                     ))}
                   </tr>

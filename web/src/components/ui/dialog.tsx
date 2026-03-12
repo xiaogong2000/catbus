@@ -18,7 +18,11 @@ export function Dialog({ open, onClose, title, children, className }: DialogProp
       if (e.key === "Escape") onClose();
     }
     document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      document.body.style.overflow = "";
+    };
   }, [open, onClose]);
 
   if (!open) return null;
@@ -26,7 +30,7 @@ export function Dialog({ open, onClose, title, children, className }: DialogProp
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
-        className="absolute inset-0 bg-[--c-overlay]"
+        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
         onClick={onClose}
       />
       <div

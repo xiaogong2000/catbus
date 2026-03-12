@@ -4,16 +4,20 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
+import { PageTransition } from "@/components/motion/page-transition";
 import { StatsRow } from "@/components/data-display/stats-row";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatUptime, relativeTime } from "@/lib/mock-data-dashboard";
 import type { Agent, CallRecord, DailyCallStat } from "@/lib/mock-data-dashboard";
-import { fetchAgentDetail } from "@/lib/dashboard-api";
+import { fetchAgentDetail, getProviderConfig, saveProviderConfig, getIncomingHireRequests, respondToHireRequest, getHireContracts } from "@/lib/dashboard-api";
+import type { ProviderConfig, SaveProviderConfigRequest, IncomingHireRequest, HireContract } from "@/lib/provider-types";
+import { ProviderConfigForm } from "@/components/provider/provider-config-form";
 import { cn } from "@/lib/utils";
 import { thClass, tdBaseClass, trHoverClass } from "@/lib/table-styles";
-import { ArrowLeft, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { ArrowLeft, ArrowDownLeft, ArrowUpRight, ChevronDown, ChevronUp, Settings2, Inbox, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { useLocale } from "@/components/locale-provider";
 import {
   LineChart,
@@ -53,6 +57,16 @@ export default function AgentDetailPage() {
   const [calls, setCalls] = useState<CallRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [providerConfig, setProviderConfig] = useState<ProviderConfig | null>(null);
+  const [configOpen, setConfigOpen] = useState(false);
+  const [configSaving, setConfigSaving] = useState(false);
+  const [configSaved, setConfigSaved] = useState(false);
+
+  // Hire requests & contracts for this agent
+  const [hireRequests, setHireRequests] = useState<IncomingHireRequest[]>([]);
+  const [hireContracts, setHireContracts] = useState<HireContract[]>([]);
+  const [requestsOpen, setRequestsOpen] = useState(false);
+  const [respondingTo, setRespondingTo] = useState<string | null>(null);
 
   const chartText = useCssVar("--c-text-muted", "hsl(0 0% 50%)");
   const chartBg = useCssVar("--c-bg-elevated", "hsl(0 0% 6%)");
@@ -68,10 +82,81 @@ export default function AgentDetailPage() {
         setAgent(res.agent);
         setChartData(res.weekly_stats);
         setCalls(res.recent_calls);
+        return getProviderConfig(params.id);
       })
+      .then(setProviderConfig)
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load"))
       .finally(() => setLoading(false));
   }, [params.id]);
+
+  async function handleSaveConfig(config: SaveProviderConfigRequest) {
+    if (!agent) return;
+    setConfigSaving(true);
+    try {
+      await saveProviderConfig(agent.node_id, config);
+      setConfigSaved(true);
+      setTimeout(() => setConfigSaved(false), 3000);
+    } finally {
+      setConfigSaving(false);
+    }
+  }
+
+  async function loadHireData() {
+    try {
+      const [reqRes, conRes] = await Promise.all([
+        getIncomingHireRequests(undefined, params.id).catch(() => ({ requests: [], pending_count: 0 })),
+        getHireContracts(params.id).catch(() => ({ contracts: [] })),
+      ]);
+      // Normalize backend response — may have different field names
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setHireRequests((reqRes.requests || []).map((r: any) => ({
+        id: r.id || "",
+        requester_name: r.requester_name || `User ${r.requester_id || ""}`,
+        target_node_id: r.target_node_id || r.node_id || "",
+        target_name: r.target_name || r.node_id || "",
+        message: r.message || "",
+        status: (r.status || "pending") as "pending" | "approved" | "rejected" | "expired",
+        requested_at: r.requested_at || r.created_at || new Date().toISOString(),
+      })));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setHireContracts((conRes.contracts || []).map((c: any) => ({
+        id: c.id || "",
+        hirer_name: c.hirer_name || `User ${c.requester_id || ""}`,
+        node_id: c.node_id || "",
+        allowed_skills: c.allowed_skills || [],
+        rate_limit: c.rate_limit || 0,
+        price_per_call: c.price_per_call || 0,
+        status: c.status === "active" ? "active" as const : "terminated" as const,
+        hired_at: c.hired_at || new Date().toISOString(),
+        expires_at: c.expires_at || null,
+        total_calls: c.total_calls || 0,
+        total_cost: c.total_cost || 0,
+      })));
+    } catch {
+      setHireRequests([]);
+      setHireContracts([]);
+    }
+  }
+
+  async function handleRespond(requestId: string, action: "approve" | "reject") {
+    setRespondingTo(requestId);
+    try {
+      await respondToHireRequest(requestId, action);
+      setHireRequests((prev) =>
+        prev.map((r) =>
+          r.id === requestId ? { ...r, status: action === "approve" ? "approved" : "rejected" } : r,
+        ),
+      );
+    } finally {
+      setRespondingTo(null);
+    }
+  }
+
+  function toggleRequestsSection() {
+    const next = !requestsOpen;
+    setRequestsOpen(next);
+    if (next) loadHireData();
+  }
 
   if (loading) {
     return (
@@ -140,7 +225,7 @@ export default function AgentDetailPage() {
   ];
 
   return (
-    <>
+    <PageTransition>
       <Link
         href="/dashboard/agents"
         className="inline-flex items-center gap-1 text-[13px] text-text-muted hover:text-text transition-[color] duration-[--motion-base] mb-4"
@@ -211,6 +296,147 @@ export default function AgentDetailPage() {
             </LineChart>
           </ResponsiveContainer>
         </Card>
+      </section>
+
+      {/* Provider Config */}
+      {providerConfig && (
+        <section className="mb-8">
+          <button
+            onClick={() => setConfigOpen((v) => !v)}
+            className="flex items-center gap-2 w-full text-left mb-4 cursor-pointer"
+          >
+            <Settings2 size={18} className="text-text-dim" />
+            <h2 className="text-[18px] font-bold text-text">
+              {t("dash.agentDetail.providerConfig")}
+            </h2>
+            {configSaved && (
+              <span className="text-[12px] text-success ml-2">{t("dash.agentDetail.configSaved")}</span>
+            )}
+            <span className="ml-auto text-text-muted">
+              {configOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            </span>
+          </button>
+          {configOpen && (
+            <Card hoverable={false}>
+              <ProviderConfigForm
+                models={providerConfig.models}
+                skills={providerConfig.skills}
+                onSave={handleSaveConfig}
+                saving={configSaving}
+              />
+            </Card>
+          )}
+        </section>
+      )}
+
+      {/* Hire Requests & Contracts */}
+      <section className="mb-8">
+        <button
+          onClick={toggleRequestsSection}
+          className="flex items-center gap-2 w-full text-left mb-4 cursor-pointer"
+        >
+          <Inbox size={18} className="text-text-dim" />
+          <h2 className="text-[18px] font-bold text-text">
+            {t("dash.agentDetail.hireRequests")}
+          </h2>
+          <span className="ml-auto text-text-muted">
+            {requestsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          </span>
+        </button>
+        {requestsOpen && (
+          <div className="space-y-6">
+            {/* Pending Requests */}
+            <div>
+              <h3 className="text-[13px] uppercase tracking-wider text-text-muted font-semibold mb-3">
+                {t("dash.agentDetail.pendingRequests")}
+              </h3>
+              {hireRequests.length > 0 ? (
+                <div className="space-y-2">
+                  {hireRequests.map((req) => (
+                    <Card key={req.id} hoverable={false} className="flex items-center gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[14px] font-semibold text-text">
+                            {req.requester_name}
+                          </span>
+                          <span className={cn(
+                            "text-[10px] font-semibold uppercase border rounded-full px-2 py-0.5",
+                            req.status === "pending" ? "text-warning bg-warning/10 border-warning/20" :
+                            req.status === "approved" ? "text-success bg-success/10 border-success/20" :
+                            "text-danger bg-danger/10 border-danger/20"
+                          )}>
+                            {t(`dash.hired.${req.status}`)}
+                          </span>
+                        </div>
+                        {req.message && (
+                          <p className="text-[12px] text-text-dim">{req.message}</p>
+                        )}
+                        <p className="text-[11px] text-text-muted mt-1">
+                          {relativeTime(req.requested_at)}
+                        </p>
+                      </div>
+                      {req.status === "pending" && (
+                        <div className="flex gap-2 shrink-0">
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => handleRespond(req.id, "approve")}
+                            disabled={respondingTo === req.id}
+                          >
+                            {respondingTo === req.id ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <CheckCircle size={14} className="mr-1" />
+                            )}
+                            {t("dash.agentDetail.approve")}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRespond(req.id, "reject")}
+                            disabled={respondingTo === req.id}
+                            className="text-text-muted hover:text-danger"
+                          >
+                            <XCircle size={14} className="mr-1" />
+                            {t("dash.agentDetail.reject")}
+                          </Button>
+                        </div>
+                      )}
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[13px] text-text-muted py-4">{t("dash.agentDetail.noRequests")}</p>
+              )}
+            </div>
+
+            {/* Active Contracts */}
+            <div>
+              <h3 className="text-[13px] uppercase tracking-wider text-text-muted font-semibold mb-3">
+                {t("dash.agentDetail.activeContracts")}
+              </h3>
+              {hireContracts.length > 0 ? (
+                <div className="space-y-2">
+                  {hireContracts.map((c) => (
+                    <Card key={c.id} hoverable={false} className="flex items-center gap-4">
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[14px] font-semibold text-text">{c.hirer_name}</span>
+                        <div className="flex gap-4 text-[12px] text-text-muted mt-1">
+                          <span>{c.rate_limit} {t("dash.hired.rateLimit")}</span>
+                          <span>{c.total_calls} {t("dash.hired.totalCalls")}</span>
+                          <span>{c.total_cost.toFixed(1)} {t("dash.hired.totalCost")}</span>
+                        </div>
+                      </div>
+                      <Badge status={c.status === "active" ? "online" : "offline"} label={c.status} />
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[13px] text-text-muted py-4">{t("dash.agentDetail.noContracts")}</p>
+              )}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Skills */}
@@ -301,6 +527,6 @@ export default function AgentDetailPage() {
           </Card>
         )}
       </section>
-    </>
+    </PageTransition>
   );
 }

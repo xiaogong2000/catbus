@@ -10,12 +10,16 @@ import {
   Briefcase,
   History,
   Settings,
+  Coins,
+  Trophy,
 } from "lucide-react";
 
 const sidebarLinks = [
   { key: "dash.sidebar.overview", href: "/dashboard", icon: LayoutDashboard },
   { key: "dash.sidebar.agents", href: "/dashboard/agents", icon: Bot },
   { key: "dash.sidebar.hired", href: "/dashboard/hired", icon: Briefcase },
+  { key: "dash.sidebar.earnings", href: "/dashboard/earnings", icon: Coins },
+  { key: "dash.sidebar.leaderboard", href: "/dashboard/leaderboard", icon: Trophy },
   { key: "dash.sidebar.calls", href: "/dashboard/calls", icon: History },
   { key: "dash.sidebar.settings", href: "/dashboard/settings", icon: Settings },
 ];

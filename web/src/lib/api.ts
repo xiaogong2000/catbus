@@ -15,6 +15,8 @@ export interface ApiNode {
   name: string;
   skills: string[];
   uptime_seconds: number;
+  connected_at?: number;
+  last_heartbeat?: number;
   status: "online" | "offline";
 }
 
@@ -75,7 +77,14 @@ export async function getStats(): Promise<NetworkStats> {
 }
 
 export async function getNodes(page = 1, limit = 50): Promise<Paginated<ApiNode>> {
-  return fetchApi<Paginated<ApiNode>>(`/nodes?page=${page}&limit=${limit}`);
+  const res = await fetchApi<Paginated<ApiNode>>(`/nodes?page=${page}&limit=${limit}`);
+  // Compute uptime_seconds from connected_at if not provided
+  const now = Date.now() / 1000;
+  res.data = res.data.map((node) => ({
+    ...node,
+    uptime_seconds: node.uptime_seconds || (node.connected_at ? Math.floor(now - node.connected_at) : 0),
+  }));
+  return res;
 }
 
 export async function getSkills(page = 1, limit = 50): Promise<Paginated<ApiSkill>> {

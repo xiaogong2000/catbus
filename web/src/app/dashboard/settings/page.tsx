@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/page-header";
+import { PageTransition } from "@/components/motion/page-transition";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -126,7 +127,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <>
+    <PageTransition>
       <PageHeader
         eyebrow={t("dash.eyebrow")}
         title={t("dash.settings.title")}
@@ -285,6 +286,6 @@ export default function SettingsPage() {
           </div>
         </Card>
       </section>
-    </>
+    </PageTransition>
   );
 }
