@@ -93,3 +93,21 @@ Extend existing `GET /api/dashboard/stats` with `today_earnings`, `total_credits
 The document includes complete request/response JSON schemas, TypeScript interfaces, database table design (SQL), ranking query examples, and priority levels (P0–P3).
 
 **Frontend integration**: All API functions are already implemented in `web/src/lib/dashboard-api.ts` with mock fallbacks. Once backend returns the specified JSON format, frontend will automatically switch from mock to real data — **no frontend changes needed**.
+
+---
+
+### Relay API Request: Node IP Address for GeoIP (2026-03-12)
+
+**File**: [`relay-api-request-geoip-2026-03-12.md`](relay-api-request-geoip-2026-03-12.md)
+
+Frontend is building a **3D Globe visualization** for the Network Overview page, placing Agent nodes on a world map. This requires knowing each node's geographic location via GeoIP lookup.
+
+**Request**: Add `connected_from` field (client IP address) to `GET /api/nodes` response.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `connected_from` | `string \| null` | Node's client IP at connection time |
+
+**Impact**: One field added to existing endpoint. No breaking changes — field is optional, frontend has hash-based fallback if field is missing.
+
+**Implementation**: Read `remoteAddress` from WebSocket/HTTP connection, include in node data response. Estimated effort: ~1 line of code.

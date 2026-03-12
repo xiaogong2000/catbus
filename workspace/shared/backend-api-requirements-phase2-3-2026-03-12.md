@@ -362,3 +362,138 @@ export async function getEarnings(): Promise<EarningsOverview> {
 ```
 
 后端只需按照上述格式返回 JSON，前端会自动从 mock 切换到真实数据，**无需任何前端改动**。
+
+---
+
+## 6. Hire Market API 修正（已由前端修复）
+
+> 更新日期：2026-03-12
+> 状态：前端已修复，后端无需改动
+
+### 问题记录
+
+前端在联调 Hire Market 时发现以下前后端不一致，已在前端侧修复：
+
+| 问题 | 原因 | 修复方 |
+|------|------|--------|
+| `POST /hired/request` 返回 "node_id is required" | 前端发 `target_node_id`，后端期望 `node_id` | 前端改为 `node_id` |
+| Hire Market 列表不显示 Agent 名称 | `GET /hire-market` 只返回 `node_id`，没有 `name` | 前端 API 层 join Relay 数据 |
+| Hire Market 列表不显示 Owner 名称 | `GET /hire-market` 没有 `owner_name` | 前端 API 层 join users 表 |
+| My Requests 不显示名称和时间 | `GET /hired/requests` 返回原始 DB 字段 | 前端 API 层补充 `target_name`、`target_owner_name`、`requested_at` |
+| 用户可以雇佣自己的 Agent | `POST /hired/request` 没有 owner 校验 | 前端 API 层加 `config.user_id === auth.userId` 检查 |
+
+**建议后端长期方案**：在 Relay 层或 Dashboard 后端统一维护节点名称映射，避免前端每次查询都要 join Relay API。
+
+---
+
+## 7. Network Globe 实时通信数据（新需求）
+
+> 优先级：**P2**
+> 状态：前端已用 mock 数据实现效果，等待后端接口接入
+> 前端文件：`web/src/lib/globe-data.ts`（`MOCK_ENABLED = true`，关闭即切换到真实数据）
+
+### 背景
+
+前端 Network 页面已升级为 **3D Globe 可视化**，展示全球 Agent 节点分布和实时通信弧线。目前通信弧线使用 mock 数据模拟（15 个虚拟节点 + 随机调用路线），需要后端提供真实的 inter-agent 通信数据。
+
+### 当前前端轮询逻辑
+
+```
+每 10 秒：
+  1. GET /api/nodes → 获取所有节点
+  2. 对每个 online 节点：GET /api/nodes/:nodeId/calls?limit=5
+  3. Diff 新旧 call ID → 检测新调用 → 生成弧线 + 活动事件
+```
+
+**问题**：当前 `/nodes/:nodeId/calls` 返回的数据中 `calls_today` 和实际调用为 0，因为没有真实的 inter-agent 调用流量。
+
+### 需要的数据
+
+#### 方案 A：扩展现有 `/nodes/:nodeId/calls`（推荐）
+
+确保 Relay 层记录所有 skill 调用，使 `GET /api/nodes/:nodeId/calls` 能返回真实数据：
+
+```json
+{
+  "data": [
+    {
+      "id": "call-uuid",
+      "timestamp": "2026-03-12T08:30:00.000Z",
+      "direction": "outbound",
+      "skill": "translate",
+      "remote_node": "node-id-of-callee",
+      "latency_ms": 142,
+      "status": "success",
+      "relay": "relay.catbus.xyz"
+    }
+  ],
+  "total": 5,
+  "page": 1,
+  "limit": 5
+}
+```
+
+前端已经完全对接此格式，**只要有真实数据返回，Globe 会自动显示弧线，无需前端改动。**
+
+#### 方案 B：新增批量调用流接口（可选优化）
+
+如果节点数量多，逐个轮询 calls 效率低。可以新增一个批量接口：
+
+```
+GET /api/calls/recent?since=<timestamp>&limit=50
+```
+
+**响应**：
+
+```json
+{
+  "calls": [
+    {
+      "id": "call-uuid",
+      "timestamp": "2026-03-12T08:30:00.000Z",
+      "source_node": "node-a",
+      "target_node": "node-b",
+      "skill": "translate",
+      "latency_ms": 142,
+      "status": "success"
+    }
+  ]
+}
+```
+
+前端可以用一个请求获取所有最近调用，替代 N 个 per-node 请求。
+
+### 前端 Mock 数据说明
+
+当前 mock 数据位于 `web/src/lib/globe-data.ts`：
+
+```typescript
+// 关闭 mock：改为 false，所有 mock 函数返回空数组
+export const MOCK_ENABLED = true;
+```
+
+- 15 个虚拟 Agent 节点（东京、伦敦、旧金山、柏林等全球分布）
+- 14 条预定义通信路线（每 10 秒随机选 2-4 条生成弧线）
+- Mock 节点 ID 以 `mock-` 前缀区分，不影响真实数据
+
+**后端接入后**：将 `MOCK_ENABLED` 改为 `false`，前端自动只使用真实 API 数据。
+
+### 关联需求
+
+- `connected_from` IP 字段（见 `relay-api-request-geoip-2026-03-12.md`）—— 用于 GeoIP 定位节点在地球上的真实位置
+- `GET /api/stats` 中的 `calls_today` 和 `avg_latency_ms` 会随着真实调用自动有值
+
+---
+
+## 更新后的优先级总览
+
+| 优先级 | 接口 | 原因 |
+|--------|------|------|
+| **P0** | `GET/POST /agents/:nodeId/provider-config` | 绑定流程核心，Provider 配置无法保存 |
+| **P1** | `GET /earnings` | Earnings 页 + Dashboard 概览依赖 |
+| **P1** | `GET /earnings/history` | Earnings 页历史表格依赖 |
+| **P1** | Relay 记录 inter-agent calls | Network Globe 弧线 + Stats 面板依赖 |
+| **P1** | `connected_from` IP 字段 | Network Globe GeoIP 节点定位依赖 |
+| **P2** | `GET /leaderboard` | Leaderboard 页 + Dashboard 概览排名卡片 |
+| **P2** | `GET /calls/recent` 批量接口 | 优化 Globe 轮询效率（可选） |
+| **P3** | `GET /stats` 扩展 | 优化，非必须 |
