@@ -51,3 +51,45 @@ CatBus 项目的共享文档和规格说明，供所有团队成员使用。
 文档还包含 TypeScript 接口定义、数据库表设计（SQL）、错误处理约定，以及 Relay 层合约调用路由的集成设计。
 
 **前端桩函数位置**: `web/src/lib/dashboard-api.ts`（搜索 `TODO` 注释）
+
+---
+
+### 后端 API 需求 — Phase 2 & 3 (2026-03-12)
+
+**文件**: [`backend-api-requirements-phase2-3-2026-03-12.md`](backend-api-requirements-phase2-3-2026-03-12.md)
+
+收益页、排行榜页和 Dashboard Provider 统计卡片的前端页面**已全部完成并部署**到 catbus.xyz，当前使用 mock 数据运行。本文档定义了后端需要实装的 API 接口规范，实装后前端自动切换到真实数据。
+
+**1. 收益系统**（2 个接口）
+
+Provider 收益追踪 — 概览统计和分页历史记录：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/dashboard/earnings` | 收益概览（今日/本周/本月/累计） |
+| GET | `/api/dashboard/earnings/history` | 分页收益明细记录 |
+
+**2. 排行榜**（1 个接口）
+
+全网 Provider 排名及当前用户的排名位置：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/dashboard/leaderboard` | Top N Provider + 当前用户排名 |
+
+**3. Provider 配置**（2 个接口）
+
+读写每个 Agent 的 Provider 配置（模型、技能、雇佣设置）：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/dashboard/agents/:nodeId/provider-config` | 获取 Provider 配置 |
+| POST | `/api/dashboard/agents/:nodeId/provider-config` | 保存 Provider 配置 |
+
+**4. Dashboard Stats 扩展**（可选）
+
+扩展现有 `GET /api/dashboard/stats` 接口，新增 `today_earnings`、`total_credits`、`provider_rank` 字段。优先级低 — 前端目前通过独立接口获取这些数据。
+
+文档包含完整的请求/响应 JSON 格式、TypeScript 类型定义、数据库建表 SQL、排名查询示例和优先级划分（P0–P3）。
+
+**前端对接**：所有 API 函数已在 `web/src/lib/dashboard-api.ts` 中实现，带 mock 回退。后端只需按文档格式返回 JSON，前端自动从 mock 切换到真实数据 — **无需任何前端改动**。

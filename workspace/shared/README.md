@@ -51,3 +51,45 @@ A bilateral authorization model for hiring other users' Agents:
 The document also includes TypeScript interfaces, database schema (SQL), error handling conventions, and Relay-layer integration design for contract-based call routing.
 
 **Frontend stubs**: `web/src/lib/dashboard-api.ts` (search for `TODO` comments)
+
+---
+
+### Backend API Requirements — Phase 2 & 3 (2026-03-12)
+
+**File**: [`backend-api-requirements-phase2-3-2026-03-12.md`](backend-api-requirements-phase2-3-2026-03-12.md)
+
+Frontend pages for Earnings, Leaderboard, and Dashboard Provider stats are **fully built and deployed** at catbus.xyz, currently running on mock data. This document specifies the API contracts needed to replace mock data with real backend responses.
+
+**1. Earnings** (2 endpoints)
+
+Provider earnings tracking — overview stats and paginated history:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/dashboard/earnings` | Earnings overview (today/week/month/total) |
+| GET | `/api/dashboard/earnings/history` | Paginated earnings history records |
+
+**2. Leaderboard** (1 endpoint)
+
+Global Provider ranking with current user's position:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/dashboard/leaderboard` | Top N providers + current user rank |
+
+**3. Provider Config** (2 endpoints)
+
+Read/write Provider configuration (models, skills, hire settings) for each Agent:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/dashboard/agents/:nodeId/provider-config` | Get Provider config |
+| POST | `/api/dashboard/agents/:nodeId/provider-config` | Save Provider config |
+
+**4. Dashboard Stats Extension** (optional)
+
+Extend existing `GET /api/dashboard/stats` with `today_earnings`, `total_credits`, `provider_rank` fields. Low priority — frontend currently fetches these from separate endpoints.
+
+The document includes complete request/response JSON schemas, TypeScript interfaces, database table design (SQL), ranking query examples, and priority levels (P0–P3).
+
+**Frontend integration**: All API functions are already implemented in `web/src/lib/dashboard-api.ts` with mock fallbacks. Once backend returns the specified JSON format, frontend will automatically switch from mock to real data — **no frontend changes needed**.
