@@ -10,7 +10,7 @@ CatBus 项目的共享文档和规格说明，供所有团队成员使用。
 
 ### 后端 API 需求文档 (2026-03-11)
 
-**文件**: [`backend-api-requirements-2026-03-11.md`](backend-api-requirements-2026-03-11.md)
+**文件**: [`yp-backend-api-requirements-2026-03-11.md`](yp-backend-api-requirements-2026-03-11.md)
 
 前端 Dashboard 已完成开发，使用桩函数（stub）等待后端实现。本文档定义了两大功能模块的 API 接口规范：
 
@@ -56,7 +56,7 @@ CatBus 项目的共享文档和规格说明，供所有团队成员使用。
 
 ### 后端 API 需求 — Phase 2 & 3 (2026-03-12)
 
-**文件**: [`backend-api-requirements-phase2-3-2026-03-12.md`](backend-api-requirements-phase2-3-2026-03-12.md)
+**文件**: [`yp-backend-api-requirements-phase2-3-2026-03-12.md`](yp-backend-api-requirements-phase2-3-2026-03-12.md)
 
 收益页、排行榜页和 Dashboard Provider 统计卡片的前端页面**已全部完成并部署**到 catbus.xyz，当前使用 mock 数据运行。本文档定义了后端需要实装的 API 接口规范，实装后前端自动切换到真实数据。
 

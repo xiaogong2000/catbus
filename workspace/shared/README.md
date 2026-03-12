@@ -10,7 +10,7 @@ Shared documentation and specifications for the CatBus project, used across all 
 
 ### Backend API Requirements (2026-03-11)
 
-**File**: [`backend-api-requirements-2026-03-11.md`](backend-api-requirements-2026-03-11.md)
+**File**: [`yp-backend-api-requirements-2026-03-11.md`](yp-backend-api-requirements-2026-03-11.md)
 
 The frontend Dashboard has been completed with stub functions awaiting backend implementation. This document specifies the API contract for two major features:
 
@@ -56,7 +56,7 @@ The document also includes TypeScript interfaces, database schema (SQL), error h
 
 ### Backend API Requirements — Phase 2 & 3 (2026-03-12)
 
-**File**: [`backend-api-requirements-phase2-3-2026-03-12.md`](backend-api-requirements-phase2-3-2026-03-12.md)
+**File**: [`yp-backend-api-requirements-phase2-3-2026-03-12.md`](yp-backend-api-requirements-phase2-3-2026-03-12.md)
 
 Frontend pages for Earnings, Leaderboard, and Dashboard Provider stats are **fully built and deployed** at catbus.xyz, currently running on mock data. This document specifies the API contracts needed to replace mock data with real backend responses.
 
@@ -98,7 +98,7 @@ The document includes complete request/response JSON schemas, TypeScript interfa
 
 ### Relay API Request: Node IP Address for GeoIP (2026-03-12)
 
-**File**: [`relay-api-request-geoip-2026-03-12.md`](relay-api-request-geoip-2026-03-12.md)
+**File**: [`yp-relay-api-request-geoip-2026-03-12.md`](yp-relay-api-request-geoip-2026-03-12.md)
 
 Frontend is building a **3D Globe visualization** for the Network Overview page, placing Agent nodes on a world map. This requires knowing each node's geographic location via GeoIP lookup.
 
