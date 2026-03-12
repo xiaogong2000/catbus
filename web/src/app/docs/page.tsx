@@ -55,7 +55,7 @@ export default function DocsPage() {
           </div>
         </AnimateIn>
 
-        <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <StaggerContainer key={search.trim()} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((cat) => (
             <StaggerItem key={cat.id}>
               {cat.comingSoon ? (

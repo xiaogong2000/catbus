@@ -18,17 +18,22 @@ export default function EarningsPage() {
   const { t } = useLocale();
   const [overview, setOverview] = useState<EarningsOverview | null>(null);
   const [history, setHistory] = useState<EarningRecord[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const limit = 20;
   const [loading, setLoading] = useState(true);
+  const [tableLoading, setTableLoading] = useState(false);
 
   useEffect(() => {
     async function load() {
       try {
         const [o, h] = await Promise.all([
           getEarnings(),
-          getEarningsHistory({ page: 1, limit: 20 }),
+          getEarningsHistory({ page: 1, limit }),
         ]);
         setOverview(o);
         setHistory(h.data);
+        setTotal(h.total);
       } catch (err) {
         console.error("Failed to load earnings:", err);
       } finally {
@@ -37,6 +42,22 @@ export default function EarningsPage() {
     }
     load();
   }, []);
+
+  async function goToPage(p: number) {
+    setTableLoading(true);
+    try {
+      const h = await getEarningsHistory({ page: p, limit });
+      setHistory(h.data);
+      setTotal(h.total);
+      setPage(p);
+    } catch (err) {
+      console.error("Failed to load page:", err);
+    } finally {
+      setTableLoading(false);
+    }
+  }
+
+  const totalPages = Math.max(1, Math.ceil(total / limit));
 
   const stats = overview
     ? [
@@ -102,7 +123,7 @@ export default function EarningsPage() {
             <Skeleton variant="text" width="90%" height={16} />
           </Card>
         ) : history.length > 0 ? (
-          <div className="border border-border rounded-lg overflow-hidden">
+          <div className={cn("border border-border rounded-lg overflow-hidden", tableLoading && "opacity-60 pointer-events-none")}>
             <table className="w-full border-collapse">
               <thead>
                 <tr>
@@ -152,6 +173,34 @@ export default function EarningsPage() {
                 ))}
               </tbody>
             </table>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-bg-elevated/50">
+                <span className="text-[12px] text-text-dim">
+                  {t("dash.earnings.showing")} {(page - 1) * limit + 1}–{Math.min(page * limit, total)} / {total}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => goToPage(page - 1)}
+                    disabled={page <= 1}
+                    className="text-[12px] text-text-dim hover:text-text border border-border rounded px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    ← {t("dash.earnings.prev")}
+                  </button>
+                  <span className="text-[12px] text-text-dim tabular-nums">
+                    {page} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => goToPage(page + 1)}
+                    disabled={page >= totalPages}
+                    className="text-[12px] text-text-dim hover:text-text border border-border rounded px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {t("dash.earnings.next")} →
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <Card hoverable={false} className="py-16 text-center">

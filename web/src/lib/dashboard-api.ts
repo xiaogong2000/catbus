@@ -202,7 +202,7 @@ export async function createHireRequest(
   return dashFetch("/hired/request", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ target_node_id: nodeId, message }),
+    body: JSON.stringify({ node_id: nodeId, message }),
   });
 }
 

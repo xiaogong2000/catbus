@@ -4,20 +4,12 @@ import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageTransition } from "@/components/motion/page-transition";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatUptime } from "@/lib/mock-data-dashboard";
-import type { Agent } from "@/lib/mock-data-dashboard";
 import {
   fetchSettings,
-  fetchAgents,
   updateSettings,
-  bindAgent,
-  unbindAgent,
 } from "@/lib/dashboard-api";
-import { Github, Bot, Bell, Link2, Unlink } from "lucide-react";
+import { Github, Bell } from "lucide-react";
 import { useLocale } from "@/components/locale-provider";
 
 export default function SettingsPage() {
@@ -29,26 +21,15 @@ export default function SettingsPage() {
     daily_report: false,
     weekly_report: false,
   });
-  const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const [bindStep, setBindStep] = useState<"idle" | "input">("idle");
-  const [nodeIdInput, setNodeIdInput] = useState("");
-  const [bindError, setBindError] = useState<string | null>(null);
-  const [binding, setBinding] = useState(false);
-  const [unbinding, setUnbinding] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       try {
-        const [settings, agentList] = await Promise.all([
-          fetchSettings(),
-          fetchAgents(),
-        ]);
+        const settings = await fetchSettings();
         setEmail(settings.email);
         setGithubUsername(settings.github_username ?? "");
         setNotifications(settings.notifications);
-        setAgents(agentList);
       } catch (err) {
         console.error("Failed to load settings:", err);
       } finally {
@@ -64,36 +45,6 @@ export default function SettingsPage() {
     updateSettings({ notifications: { [key]: newVal } }).catch(() => {
       // Backend not ready yet — keep frontend state as-is
     });
-  }
-
-  async function handleBind() {
-    const nodeId = nodeIdInput.trim();
-    if (!nodeId) return;
-    setBinding(true);
-    setBindError(null);
-    try {
-      const res = await bindAgent(nodeId);
-      setAgents((prev) => [...prev, res.agent]);
-      setBindStep("idle");
-      setNodeIdInput("");
-    } catch (err) {
-      setBindError(err instanceof Error ? err.message : "Failed to bind agent");
-    } finally {
-      setBinding(false);
-    }
-  }
-
-  async function handleUnbind(nodeId: string) {
-    if (!confirm(t("dash.settings.confirmUnbind"))) return;
-    setUnbinding(nodeId);
-    try {
-      await unbindAgent(nodeId);
-      setAgents((prev) => prev.filter((a) => a.node_id !== nodeId));
-    } catch (err) {
-      console.error("Failed to unbind:", err);
-    } finally {
-      setUnbinding(null);
-    }
   }
 
   const notificationItems = [
@@ -152,97 +103,6 @@ export default function SettingsPage() {
             </div>
           </div>
         </Card>
-      </section>
-
-      {/* Bound Agents */}
-      <section className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-[18px] font-bold text-text">{t("dash.settings.boundAgents")}</h2>
-          {bindStep === "idle" && (
-            <Button variant="primary" size="sm" onClick={() => setBindStep("input")}>
-              <Link2 size={14} className="mr-1.5" />
-              {t("dash.settings.bindAgent")}
-            </Button>
-          )}
-        </div>
-
-        {/* Agent binding flow */}
-        {bindStep === "input" && (
-          <Card hoverable={false} className="mb-4">
-            <p className="text-[13px] text-text-dim mb-3">
-              {t("dash.settings.enterNodeId")} <code className="font-mono text-text bg-bg-elevated px-1.5 py-0.5 rounded text-[12px]">catbus status</code>:
-            </p>
-            <Input
-              placeholder={t("dash.settings.nodeIdPlaceholder")}
-              value={nodeIdInput}
-              onChange={(e) => setNodeIdInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleBind(); }}
-              className="mb-3"
-            />
-            <div className="flex gap-2 justify-end">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setBindStep("idle");
-                  setNodeIdInput("");
-                  setBindError(null);
-                }}
-              >
-                {t("dash.settings.cancel")}
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleBind}
-                disabled={binding}
-              >
-                {binding ? t("dash.settings.binding") : t("dash.settings.bind")}
-              </Button>
-            </div>
-            {bindError && (
-              <p className="text-[12px] text-danger mt-2">{bindError}</p>
-            )}
-          </Card>
-        )}
-
-        {/* Existing bound agents */}
-        <div className="grid gap-3">
-          {agents.map((agent) => (
-            <Card key={agent.node_id} hoverable={false} className="flex items-center gap-4">
-              <div className="w-9 h-9 rounded-md bg-bg-elevated border border-border flex items-center justify-center shrink-0">
-                <Bot size={18} className="text-text-dim" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-[14px] font-semibold text-text">
-                    {agent.name}
-                  </span>
-                  <Badge status={agent.status} />
-                </div>
-                <p className="text-[12px] text-text-muted">
-                  {agent.node_id} &middot; {t("dash.overview.up")} {formatUptime(agent.uptime_seconds)}
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleUnbind(agent.node_id)}
-                disabled={unbinding === agent.node_id}
-                className="shrink-0 text-text-muted hover:text-danger"
-              >
-                <Unlink size={14} className="mr-1" />
-                {unbinding === agent.node_id ? t("dash.settings.unbinding") : t("dash.settings.unbind")}
-              </Button>
-            </Card>
-          ))}
-          {agents.length === 0 && (
-            <Card hoverable={false} className="py-8 text-center">
-              <Bot size={24} className="text-text-muted mx-auto mb-2" />
-              <p className="text-[13px] text-text-dim">{t("dash.settings.noAgents")}</p>
-            </Card>
-          )}
-        </div>
       </section>
 
       {/* Notification Settings */}

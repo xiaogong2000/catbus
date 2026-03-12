@@ -103,39 +103,43 @@ export default function LeaderboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.providers.map((entry) => (
-                  <tr key={entry.node_id} className={trHoverClass}>
-                    <td className={cn(tdBaseClass, "font-bold tabular-nums")}>
-                      {entry.rank <= 3 ? (
-                        <span className={cn("inline-flex items-center gap-1", rankColors[entry.rank])}>
-                          <Medal size={16} />
-                          {entry.rank}
+                {data.providers.map((entry) => {
+                  const isMe = data.my_rank === entry.rank;
+                  return (
+                    <tr key={entry.node_id} className={cn(trHoverClass, isMe && "bg-primary/5 border-l-2 border-l-primary")}>
+                      <td className={cn(tdBaseClass, "font-bold tabular-nums")}>
+                        {entry.rank <= 3 ? (
+                          <span className={cn("inline-flex items-center gap-1", rankColors[entry.rank])}>
+                            <Medal size={16} />
+                            {entry.rank}
+                          </span>
+                        ) : (
+                          <span className="text-text-dim">{entry.rank}</span>
+                        )}
+                      </td>
+                      <td className={cn(tdBaseClass, "text-text font-semibold")}>
+                        {entry.name}
+                        {isMe && <span className="ml-1.5 text-[#FFD700]">★</span>}
+                      </td>
+                      <td className={tdBaseClass}>
+                        <span className="text-[12px] text-text-dim bg-bg-elevated border border-border rounded px-2 py-0.5 font-mono">
+                          {entry.top_model}
                         </span>
-                      ) : (
-                        <span className="text-text-dim">{entry.rank}</span>
-                      )}
-                    </td>
-                    <td className={cn(tdBaseClass, "text-text font-semibold")}>
-                      {entry.name}
-                    </td>
-                    <td className={tdBaseClass}>
-                      <span className="text-[12px] text-text-dim bg-bg-elevated border border-border rounded px-2 py-0.5 font-mono">
-                        {entry.top_model}
-                      </span>
-                    </td>
-                    <td className={cn(tdBaseClass, "text-right text-text tabular-nums")}>
-                      {entry.total_tasks.toLocaleString()}
-                    </td>
-                    <td className={cn(tdBaseClass, "text-right tabular-nums")}>
-                      <span className={entry.success_rate >= 98 ? "text-success" : entry.success_rate >= 95 ? "text-text" : "text-warning"}>
-                        {entry.success_rate}%
-                      </span>
-                    </td>
-                    <td className={cn(tdBaseClass, "text-right text-success font-semibold tabular-nums")}>
-                      {entry.total_credits.toFixed(1)}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className={cn(tdBaseClass, "text-right text-text tabular-nums")}>
+                        {entry.total_tasks.toLocaleString()}
+                      </td>
+                      <td className={cn(tdBaseClass, "text-right tabular-nums")}>
+                        <span className={entry.success_rate >= 98 ? "text-success" : entry.success_rate >= 95 ? "text-text" : "text-warning"}>
+                          {entry.success_rate}%
+                        </span>
+                      </td>
+                      <td className={cn(tdBaseClass, "text-right text-success font-semibold tabular-nums")}>
+                        {entry.total_credits.toFixed(1)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

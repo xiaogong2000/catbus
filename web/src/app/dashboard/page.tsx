@@ -12,8 +12,10 @@ import type { Agent, CallRecord, DashboardStats } from "@/lib/mock-data-dashboar
 import { fetchDashboardStats, fetchAgents, fetchCalls } from "@/lib/dashboard-api";
 import { cn, formatNumber } from "@/lib/utils";
 import { thClass, tdBaseClass, trHoverClass } from "@/lib/table-styles";
-import { Bot, ArrowDownLeft, ArrowUpRight, Link2 } from "lucide-react";
+import { Bot, ArrowDownLeft, ArrowUpRight, Link2, Coins, Trophy } from "lucide-react";
 import { useLocale } from "@/components/locale-provider";
+import { getEarnings, getLeaderboard } from "@/lib/dashboard-api";
+import type { EarningsOverview, LeaderboardResponse } from "@/lib/provider-types";
 import Link from "next/link";
 
 export default function DashboardPage() {
@@ -21,20 +23,26 @@ export default function DashboardPage() {
   const [statsData, setStatsData] = useState<DashboardStats | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [recentCalls, setRecentCalls] = useState<CallRecord[]>([]);
+  const [earnings, setEarnings] = useState<EarningsOverview | null>(null);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       try {
-        const [s, a, c] = await Promise.all([
+        const [s, a, c, e, lb] = await Promise.all([
           fetchDashboardStats(),
           fetchAgents(),
           fetchCalls({ page: 1, limit: 5 }),
+          getEarnings().catch(() => null),
+          getLeaderboard(1).catch(() => null),
         ]);
         setStatsData(s);
         setAgents(a);
         setRecentCalls(c.data);
+        setEarnings(e);
+        setLeaderboard(lb);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load");
       } finally {
@@ -104,6 +112,39 @@ export default function DashboardPage() {
         </div>
       ) : (
         <StatsRow items={stats} columns={4} className="mb-8" />
+      )}
+
+      {/* Provider Earnings Stats */}
+      {!loading && earnings && (
+        <StatsRow
+          items={[
+            {
+              label: t("dash.overview.todayEarnings"),
+              value: `${earnings.today.credits}`,
+              description: `${earnings.today.tasks} ${t("dash.earnings.tasks")}`,
+              color: "warning" as const,
+              icon: <Coins size={16} className="text-warning" />,
+            },
+            {
+              label: t("dash.overview.totalCredits"),
+              value: `${earnings.total.credits}`,
+              description: t("dash.overview.allTime"),
+              color: "success" as const,
+              icon: <Coins size={16} className="text-success" />,
+            },
+            {
+              label: t("dash.overview.providerRank"),
+              value: leaderboard?.my_rank ? `#${leaderboard.my_rank}` : "—",
+              description: leaderboard?.my_rank
+                ? `${t("dash.leaderboard.successRate")} ${leaderboard.my_stats?.success_rate ?? 0}%`
+                : t("dash.leaderboard.notRanked"),
+              color: "default" as const,
+              icon: <Trophy size={16} className="text-[#FFD700]" />,
+            },
+          ]}
+          columns={3}
+          className="mb-8"
+        />
       )}
 
       {/* My Agents */}

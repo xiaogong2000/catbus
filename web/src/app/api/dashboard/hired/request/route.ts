@@ -9,6 +9,8 @@ export async function POST(req: Request) {
   if (!body.node_id) return Response.json({ message: "node_id is required" }, { status: 400 });
   const config = getHireConfig(body.node_id);
   if (!config || config.available !== 1) return Response.json({ message: "Agent is not available for hire" }, { status: 404 });
+  // Cannot hire your own agent
+  if (config.user_id === auth.userId) return Response.json({ message: "Cannot hire your own agent" }, { status: 400 });
   const request = createHireRequest(auth.userId, body.node_id, config.user_id, body.message);
   return Response.json(request, { status: 201 });
 }
