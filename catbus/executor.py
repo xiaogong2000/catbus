@@ -1,21 +1,24 @@
 """
-CatBus Skill 执行器
+CatBus Capability 执行器
 
 支持三种 handler：
   python:module.func   — 动态 import 并调用 Python 函数
   shell:command        — subprocess 执行 shell 命令
-  gateway:model_name   — 通过 OpenClaw Gateway 执行 AI 任务（model_name 可省略，省略时用 default）
+  gateway:model_name   — 通过 OpenClaw Gateway 执行 AI 任务
+
+支持两种查找方式：
+  1. capability name: "model/claude-sonnet-4", "skill/tavily"
+  2. 兼容老格式 skill name: "echo", "tavily"
 """
 
 import asyncio
 import importlib
 import json
 import logging
-import subprocess
 import time
 from dataclasses import dataclass
 
-from .config import SkillConfig
+from .config import CapabilityConfig, SkillConfig
 from .gateway import GatewayClient
 
 log = logging.getLogger("catbus.executor")
@@ -30,26 +33,82 @@ class ExecutionResult:
 
 
 class Executor:
-    """Execute skill handlers based on config."""
+    """Execute capability handlers based on config."""
 
-    def __init__(self, skills: list[SkillConfig]):
-        self.skills: dict[str, SkillConfig] = {s.name: s for s in skills}
+    def __init__(self, capabilities: list[CapabilityConfig] = None,
+                 skills: list[SkillConfig] = None):
+        """
+        接受 capabilities（新格式）或 skills（老格式）。
+        内部统一使用 capabilities dict，key 为 full name (如 "skill/echo")。
+        同时保留 bare name 映射（如 "echo" → "skill/echo"）供向后兼容。
+        """
+        self._caps: dict[str, CapabilityConfig] = {}
+        self._bare_name_map: dict[str, str] = {}  # bare_name → full_name
 
-    def has_skill(self, name: str) -> bool:
-        return name in self.skills
+        # 加载 capabilities（新格式）
+        if capabilities:
+            for cap in capabilities:
+                self._caps[cap.name] = cap
+                # "skill/echo" → "echo" 映射
+                if "/" in cap.name:
+                    bare = cap.name.split("/", 1)[1]
+                    self._bare_name_map[bare] = cap.name
 
-    async def execute(self, skill_name: str, input_data: dict) -> ExecutionResult:
-        """Execute a skill and return the result."""
-        if skill_name not in self.skills:
+        # 加载 skills（老格式，向后兼容）
+        if skills:
+            for s in skills:
+                full_name = f"skill/{s.name}" if "/" not in s.name else s.name
+                if full_name not in self._caps:
+                    self._caps[full_name] = CapabilityConfig(
+                        type="skill",
+                        name=full_name,
+                        handler=s.handler,
+                        meta={"description": s.description},
+                    )
+                    self._bare_name_map[s.name] = full_name
+
+    def has_capability(self, name: str) -> bool:
+        """检查是否拥有某个能力（支持 full name 或 bare name）。"""
+        return name in self._caps or name in self._bare_name_map
+
+    # 保留旧接口
+    has_skill = has_capability
+
+    def _resolve_name(self, name: str) -> str | None:
+        """将输入名称解析为 full capability name。"""
+        if name in self._caps:
+            return name
+        if name in self._bare_name_map:
+            return self._bare_name_map[name]
+        return None
+
+    async def execute(self, capability_name: str, input_data: dict) -> ExecutionResult:
+        """
+        Execute a capability and return the result.
+
+        capability_name 支持：
+          - "model/claude-sonnet-4"（新格式）
+          - "skill/tavily"（新格式）
+          - "echo"（老格式 bare name，向后兼容）
+        """
+        full_name = self._resolve_name(capability_name)
+        if not full_name:
             return ExecutionResult(
                 status="error",
                 output={},
-                error=f"Unknown skill: {skill_name}",
+                error=f"Unknown capability: {capability_name}",
             )
 
-        skill = self.skills[skill_name]
-        handler = skill.handler
+        cap = self._caps[full_name]
+        handler = cap.handler
         start = time.time()
+
+        # 如果没有 handler，model/ 类型默认走 gateway:default
+        if not handler:
+            if cap.type == "model":
+                handler = "gateway:default"
+            elif cap.type == "skill":
+                handler = "gateway:default"
 
         try:
             if handler.startswith("python:"):
@@ -57,7 +116,11 @@ class Executor:
             elif handler.startswith("shell:"):
                 result = await self._run_shell(handler[6:], input_data)
             elif handler.startswith("gateway:"):
-                result = await self._run_gateway(handler[8:], input_data, skill_name=skill_name)
+                # 传递 skill routing 信息
+                skill_hint = cap.short_name if cap.type == "skill" else "agent"
+                result = await self._run_gateway(
+                    handler[8:], input_data, skill_name=skill_hint
+                )
             else:
                 return ExecutionResult(
                     status="error",
@@ -74,7 +137,7 @@ class Executor:
 
         except Exception as e:
             duration_ms = int((time.time() - start) * 1000)
-            log.error(f"Skill '{skill_name}' failed: {e}")
+            log.error(f"Capability '{full_name}' failed: {e}")
             return ExecutionResult(
                 status="error",
                 output={},
