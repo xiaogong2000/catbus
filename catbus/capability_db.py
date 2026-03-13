@@ -30,6 +30,13 @@ MODEL_DB: dict[str, dict] = {
         "arena_elo": 1550,
         "patterns": ["claude-opus-4-6", "opus-4-6", "claude.opus.4.6"],
     },
+    "claude-opus-4-5": {
+        "provider": "anthropic",
+        "context_window": 200000,
+        "strengths": ["code", "analysis", "writing", "reasoning", "general"],
+        "cost_tier": "premium",
+        "patterns": ["claude-opus-4-5", "opus-4-5", "claude.opus.4.5"],
+    },
     "claude-opus-4": {
         "provider": "anthropic",
         "context_window": 200000,
