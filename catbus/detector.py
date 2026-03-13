@@ -1,10 +1,14 @@
 """
 CatBus Model Detector — 探测本机安装了什么模型
 
-三层 fallback 探测策略（不碰任何配置文件，不读任何 API key）：
+四层 fallback 探测策略：
+
+  Layer 0: OpenClaw 配置文件（最快最准，零 token）
+    直接读 ~/.openclaw/openclaw.json，解析所有配置的 provider/model。
+    OpenClaw 没装时跳过。
 
   Layer 1: Gateway /v1/models API
-    最快最准。OpenClaw Gateway 暴露 OpenAI 兼容端点，返回当前配置的模型名。
+    OpenClaw Gateway 暴露 OpenAI 兼容端点，返回当前配置的模型名。
 
   Layer 2: Self-identification prompt
     向 Gateway 发一条精心设计的 prompt，让模型自报家门。
@@ -271,17 +275,91 @@ async def _probe_fingerprint(base_url: str, token: str | None = None) -> tuple[s
 
 # ─── Main Detection Logic ─────────────────────────────────────
 
+def _probe_openclaw_config() -> list[DetectResult]:
+    """Layer 0: 读 ~/.openclaw/openclaw.json，直接解析所有配置的 provider/model。
+    零 token，零网络，最快最准。OpenClaw 没装时静默跳过。
+    """
+    import json
+    from pathlib import Path
+    from .capability_db import extract_base_model, get_model_info
+
+    results = []
+    cfg_path = Path.home() / ".openclaw" / "openclaw.json"
+    if not cfg_path.exists():
+        return results
+
+    try:
+        cfg = json.loads(cfg_path.read_text())
+    except Exception:
+        return results
+
+    # 收集所有 provider/model（provider.models[] + agents.defaults fallbacks + primary）
+    raw_models: list[str] = []
+
+    providers_cfg = cfg.get("models", {}).get("providers", {})
+    for provider_name, provider_cfg in providers_cfg.items():
+        if isinstance(provider_cfg, dict):
+            for m in provider_cfg.get("models", []):
+                mid = m["id"] if isinstance(m, dict) else m
+                raw_models.append(f"{provider_name}/{mid}")
+
+    # primary + fallbacks（排在最前，作为优先模型）
+    agent_model = cfg.get("agents", {}).get("defaults", {}).get("model", {})
+    primary = agent_model.get("primary", "")
+    fallbacks = agent_model.get("fallbacks", [])
+    priority = [m for m in [primary] + fallbacks if m]
+
+    # 去重，priority 优先
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for raw in priority + raw_models:
+        if raw not in seen:
+            seen.add(raw)
+            ordered.append(raw)
+
+    # 标准化 + 去重 base_name
+    seen_base: set[str] = set()
+    for raw in ordered:
+        base = extract_base_model(raw)
+        if not base or base in seen_base:
+            continue
+        seen_base.add(base)
+        info = get_model_info(base)
+        results.append(DetectResult(
+            raw_name=raw,
+            base_name=base,
+            confidence="high",
+            method="openclaw_config",
+            provider=info.get("provider", ""),
+            cost_tier=info.get("cost_tier", "medium"),
+            strengths=info.get("strengths", []),
+            arena_elo=info.get("arena_elo", 0),
+            details=f"from openclaw.json provider config",
+        ))
+
+    return results
+
+
 async def detect_models(
     gateway_url: str | None = None,
     gateway_token: str | None = None,
 ) -> list[DetectResult]:
-    """探测本机安装的模型。三层 fallback，不碰任何配置文件。"""
+    """探测本机安装的模型。四层 fallback，Layer 0 直接读 OpenClaw 配置。"""
     from .capability_db import extract_base_model, get_model_info
     from .gateway import _load_token, _load_base_url
 
     base_url = gateway_url or _load_base_url()
     token = gateway_token or _load_token()
     results: list[DetectResult] = []
+
+    # Layer 0: 读 OpenClaw 配置（零 token，最快最准）
+    log.info("🔍 Layer 0: Reading OpenClaw config...")
+    layer0 = _probe_openclaw_config()
+    if layer0:
+        for r in layer0:
+            log.info(f"  ✅ Config: model/{r.base_name} ({r.provider}, {r.cost_tier})")
+        return layer0
+    log.info("  ⚠️  OpenClaw config not found, falling back to probe...")
 
     # Layer 1
     log.info("🔍 Layer 1: Probing Gateway /v1/models...")
