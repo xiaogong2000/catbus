@@ -85,10 +85,17 @@ else
     fail "未找到 pip，请先安装 Python 3：https://python.org"
   fi
   PIP=$(command -v pip3 || command -v pip)
-  $PIP install --quiet catbus || $PIP install --quiet --user catbus || \
-    $PIP install --quiet --break-system-packages catbus
+  # 从 GitHub 安装官方客户端（避免 PyPI 同名第三方包冲突）
+  INSTALL_OK=false
+  $PIP install --quiet "git+https://github.com/xiaogong2000/catbus.git" 2>/dev/null && INSTALL_OK=true
+  if [ "$INSTALL_OK" = false ]; then
+    $PIP install --quiet --user "git+https://github.com/xiaogong2000/catbus.git" 2>/dev/null && INSTALL_OK=true
+  fi
+  if [ "$INSTALL_OK" = false ]; then
+    $PIP install --quiet --break-system-packages "git+https://github.com/xiaogong2000/catbus.git" 2>/dev/null && INSTALL_OK=true
+  fi
   command -v catbus &>/dev/null || export PATH="$HOME/.local/bin:$PATH"
-  command -v catbus &>/dev/null || fail "CatBus 安装失败，请手动运行：pip install catbus"
+  command -v catbus &>/dev/null || fail "CatBus 安装失败，请手动运行：pip install git+https://github.com/xiaogong2000/catbus.git"
   ok "CatBus 安装完成"
 fi
 
