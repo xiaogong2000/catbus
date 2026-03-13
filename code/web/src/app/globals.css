@@ -1,0 +1,269 @@
+@import "tailwindcss";
+
+@config "../../tailwind.config.ts";
+
+:root {
+  /* -- Background layers -- */
+  --c-bg:           0 0% 0%;
+  --c-bg-subtle:    0 0% 3%;
+  --c-bg-elevated:  0 0% 6%;
+
+  /* -- Borders -- */
+  --c-border:       0 0% 12%;
+  --c-border-hover: 0 0% 20%;
+
+  /* -- Text -- */
+  --c-text:         0 0% 93%;
+  --c-text-dim:     0 0% 60%;
+  --c-text-muted:   0 0% 50%;
+
+  /* -- Semantic colors -- */
+  --c-primary:      220 100% 60%;
+  --c-primary-fg:   0 0% 100%;
+  --c-success:      150 100% 35%;
+  --c-warning:      35 100% 50%;
+  --c-danger:       0 100% 60%;
+
+  /* -- Overlay -- */
+  --c-overlay:      hsl(0 0% 0% / 0.8);
+
+  /* -- Particle color for constellation -- */
+  --c-particle:     0 0% 100%;
+  --c-particle-alpha: 0.3;
+
+  /* -- Chart palette (8 colors) -- */
+  --c-chart-1: hsl(239 84% 67%);
+  --c-chart-2: hsl(187 85% 53%);
+  --c-chart-3: hsl(142 71% 45%);
+  --c-chart-4: hsl(38 92% 50%);
+  --c-chart-5: hsl(0 84% 60%);
+  --c-chart-6: hsl(258 90% 66%);
+  --c-chart-7: hsl(330 81% 60%);
+  --c-chart-8: hsl(168 76% 42%);
+
+  /* -- Font families -- */
+  --font-ui:   "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+
+  /* -- Font sizes -- */
+  --text-xs:   12px;
+  --text-sm:   13px;
+  --text-base: 14px;
+  --text-md:   16px;
+  --text-lg:   18px;
+  --text-xl:   20px;
+  --text-2xl:  24px;
+  --text-3xl:  30px;
+  --text-hero: 60px;
+
+  /* -- Spacing -- */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  24px;
+  --space-6:  32px;
+  --space-8:  48px;
+  --space-10: 64px;
+  --space-12: 96px;
+
+  /* -- Border radius -- */
+  --radius-sm:   4px;
+  --radius-md:   6px;
+  --radius-lg:   8px;
+  --radius-xl:   12px;
+  --radius-full: 9999px;
+
+  /* -- Glass -- */
+  --glass-bg:      0 0% 100% / 0.06;
+  --glass-border:  0 0% 100% / 0.08;
+  --glass-shine:   0 0% 100% / 0.04;
+  --glass-blur:    24px;
+
+  /* -- Shadows -- */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4), 0 2px 4px -1px rgba(0,0,0,0.2);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.5), 0 4px 6px -2px rgba(0,0,0,0.3);
+
+  /* -- Motion -- */
+  --motion-base:   0.2s;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring:   cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+body {
+  background: hsl(var(--c-bg));
+  color: hsl(var(--c-text));
+  font-family: var(--font-ui);
+}
+
+/* -- Glass effect -- */
+.glass {
+  background: hsl(var(--glass-bg));
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid hsl(var(--glass-border));
+  box-shadow:
+    var(--shadow-sm),
+    inset 0 1px 0 0 hsl(var(--glass-shine));
+}
+
+.glass-subtle {
+  background: hsl(var(--c-bg) / 0.95);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+}
+
+/* -- Ambient glow background -- */
+.ambient-glow {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.ambient-glow::before {
+  content: "";
+  position: absolute;
+  top: -20%;
+  left: -10%;
+  width: 50%;
+  height: 60%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    hsl(var(--c-primary) / 0.06) 0%,
+    transparent 70%
+  );
+  filter: blur(80px);
+  animation: glow-drift-1 25s ease-in-out infinite alternate;
+}
+
+.ambient-glow::after {
+  content: "";
+  position: absolute;
+  bottom: -15%;
+  right: -10%;
+  width: 45%;
+  height: 55%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    hsl(var(--c-primary) / 0.04) 0%,
+    transparent 70%
+  );
+  filter: blur(80px);
+  animation: glow-drift-2 30s ease-in-out infinite alternate;
+}
+
+@keyframes glow-drift-1 {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(8%, 6%) scale(1.1); }
+  100% { transform: translate(-4%, 10%) scale(0.95); }
+}
+
+@keyframes glow-drift-2 {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(-6%, -8%) scale(1.15); }
+  100% { transform: translate(5%, -3%) scale(0.9); }
+}
+
+/* -- Noise texture overlay -- */
+.noise-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+}
+
+/* -- Third ambient blob (center) -- */
+.ambient-glow-center {
+  position: fixed;
+  top: 30%;
+  left: 40%;
+  width: 35%;
+  height: 40%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    hsl(var(--c-primary) / 0.03) 0%,
+    transparent 65%
+  );
+  filter: blur(100px);
+  pointer-events: none;
+  z-index: -1;
+  animation: glow-drift-3 35s ease-in-out infinite alternate;
+}
+
+@keyframes glow-drift-3 {
+  0%   { transform: translate(0, 0) scale(1); opacity: 0.8; }
+  50%  { transform: translate(-5%, 8%) scale(1.2); opacity: 1; }
+  100% { transform: translate(6%, -5%) scale(0.85); opacity: 0.7; }
+}
+
+/* -- Hero spotlight -- */
+.hero-spotlight {
+  position: absolute;
+  top: -180px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+  height: 500px;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    hsl(var(--c-primary) / 0.12) 0%,
+    hsl(var(--c-primary) / 0.04) 40%,
+    transparent 70%
+  );
+  filter: blur(60px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* -- Hero gradient text -- */
+.hero-gradient-text {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--c-text)) 0%,
+    hsl(var(--c-text)) 40%,
+    hsl(var(--c-primary) / 0.9) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  padding-bottom: 0.1em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* -- CTA glow button -- */
+.btn-glow {
+  background: hsl(var(--c-primary));
+  color: hsl(var(--c-primary-fg));
+  border: 1px solid hsl(var(--c-primary) / 0.6);
+  box-shadow: 0 0 20px hsl(var(--c-primary) / 0.25), inset 0 1px 0 hsl(0 0% 100% / 0.1);
+  transition: all 0.2s ease;
+}
+.btn-glow:hover {
+  box-shadow: 0 0 30px hsl(var(--c-primary) / 0.4), inset 0 1px 0 hsl(0 0% 100% / 0.15);
+  filter: brightness(1.1);
+}
