@@ -1,11 +1,11 @@
 """
 CatBus Daemon — 本地常驻进程
 
-一头连 CatBus Server（WebSocket），一头对本地暴露 HTTP API（给 Skill 调）。
-同时作为 Caller（发任务）和 Provider（接任务）。
-
-Capability 体系：REGISTER 消息携带 capabilities 列表（type/name 格式），
-同时保留 skills 字段兼容老版 relay。
+模型探测时机：
+  1. Daemon 启动时 — 完整三层探测，结果写入 REGISTER
+  2. 每 5 分钟 — 轻探测 GET /v1/models（与 skill 扫描同频）
+  3. model/ 任务失败时 — 轻探测确认模型是否还在
+  4. POST /detect — Dashboard 手动触发完整探测
 """
 
 import asyncio
@@ -18,17 +18,19 @@ import uuid
 import websockets
 from aiohttp import web
 
-from .config import Config
+from .config import Config, CapabilityConfig
 from .executor import Executor
 
 log = logging.getLogger("catbus.daemon")
+
+# 轻探测和 skill 扫描统一间隔：5 分钟
+SCAN_INTERVAL = 300
 
 
 class CatBusDaemon:
     def __init__(self, config: Config):
         self.config = config
         self.node_id = config.node_id
-        # 新版 Executor：优先使用 capabilities，fallback 到 skills
         self.executor = Executor(
             capabilities=config.capabilities,
             skills=config.skills,
@@ -41,13 +43,138 @@ class CatBusDaemon:
         self.available_skills = 0
         self.start_time = time.time()
 
-        # Pending outbound requests (waiting for result from network)
+        # Pending outbound requests
         self._pending: dict[str, asyncio.Future] = {}
+
+        # 探测到的模型（动态更新）
+        self._detected_models: list[CapabilityConfig] = []
+        self._last_model_detect: float = 0
+
+    # ─── Model Detection ───────────────────────────────────────
+
+    async def _detect_models_full(self):
+        """
+        完整三层探测（启动时调用）。
+        结果合并到 config.capabilities 并更新 executor。
+        """
+        try:
+            from .detector import detect_models
+            results = await detect_models()
+        except Exception as e:
+            log.warning(f"⚠️  Model detection failed: {e}")
+            return
+
+        new_caps = []
+        for r in results:
+            if r.base_name.startswith("unknown-"):
+                log.info(f"  📊 Fingerprint only: tier={r.cost_tier}")
+                continue
+
+            cap = CapabilityConfig(
+                type="model",
+                name=f"model/{r.base_name}",
+                handler="gateway:default",
+                meta={
+                    "provider": r.provider,
+                    "cost_tier": r.cost_tier,
+                    "strengths": r.strengths,
+                    "arena_elo": r.arena_elo,
+                    "detected": True,
+                    "detection_method": r.method,
+                    "detection_confidence": r.confidence,
+                },
+            )
+            new_caps.append(cap)
+            log.info(f"  🧠 Detected: {cap.name} ({r.method}, {r.confidence})")
+
+        self._detected_models = new_caps
+        self._last_model_detect = time.time()
+        self._merge_detected_models()
+
+    async def _detect_models_light(self) -> bool:
+        """
+        轻探测：只跑 Layer 1 (GET /v1/models)，零 token 消耗。
+        返回 True 如果模型列表有变化。
+        """
+        try:
+            from .detector import _probe_gateway_models
+            from .gateway import _load_base_url
+            from .capability_db import extract_base_model, get_model_info
+
+            base_url = _load_base_url()
+            api_models = await _probe_gateway_models(base_url)
+        except Exception as e:
+            log.debug(f"Light detect failed: {e}")
+            return False
+
+        if not api_models:
+            return False
+
+        new_names = set()
+        new_caps = []
+        for raw_name in api_models:
+            base = extract_base_model(raw_name)
+            if base:
+                full_name = f"model/{base}"
+                new_names.add(full_name)
+                info = get_model_info(base)
+                new_caps.append(CapabilityConfig(
+                    type="model",
+                    name=full_name,
+                    handler="gateway:default",
+                    meta={
+                        "provider": info.get("provider", ""),
+                        "cost_tier": info.get("cost_tier", "medium"),
+                        "strengths": info.get("strengths", ["general"]),
+                        "arena_elo": info.get("arena_elo", 0),
+                        "detected": True,
+                        "detection_method": "gateway_api",
+                    },
+                ))
+
+        old_names = {c.name for c in self._detected_models}
+        changed = new_names != old_names
+
+        if changed:
+            added = new_names - old_names
+            removed = old_names - new_names
+            if added:
+                log.info(f"  🆕 Models added: {added}")
+            if removed:
+                log.info(f"  🗑️  Models removed: {removed}")
+            self._detected_models = new_caps
+            self._merge_detected_models()
+
+        self._last_model_detect = time.time()
+        return changed
+
+    def _merge_detected_models(self):
+        """
+        将探测到的模型合并到 config.capabilities 和 executor。
+        手动配置的 model/ 优先，探测结果只追加不覆盖。
+        """
+        manual_models = {
+            c.name for c in self.config.capabilities
+            if c.type == "model" and not c.meta.get("detected")
+        }
+
+        kept = [
+            c for c in self.config.capabilities
+            if c.type != "model" or c.name in manual_models
+        ]
+        for cap in self._detected_models:
+            if cap.name not in manual_models:
+                kept.append(cap)
+
+        self.config.capabilities = kept
+        self.executor = Executor(
+            capabilities=self.config.capabilities,
+            skills=self.config.skills,
+        )
 
     # ─── WebSocket Client ──────────────────────────────────────
 
     async def ws_connect(self):
-        """Connect to CatBus Server with auto-reconnect."""
         retry_delay = 5
         while True:
             try:
@@ -63,7 +190,6 @@ class CatBusDaemon:
                     log.info("🟢 Connected to CatBus Server")
 
                     await self._send_register()
-
                     heartbeat_task = asyncio.create_task(self._heartbeat_loop())
 
                     try:
@@ -86,16 +212,13 @@ class CatBusDaemon:
             except Exception as e:
                 self.connected = False
                 self.ws = None
-                log.warning(f"⚠️  Unexpected error in ws_connect: {e}. Retrying in {retry_delay}s...")
+                log.warning(f"⚠️  Unexpected error: {e}. Retrying in {retry_delay}s...")
                 await asyncio.sleep(retry_delay)
                 retry_delay = min(retry_delay * 2, 60)
 
     async def _send_register(self):
-        """Send REGISTER message to server with capabilities + skills (backward compat)."""
-        # 新格式：capabilities 列表
         caps_data = [cap.to_register_dict() for cap in self.config.capabilities]
 
-        # 向后兼容：也发 skills 列表（老版 relay 只认 skills）
         skills_data = []
         for cap in self.config.capabilities:
             if cap.type == "skill":
@@ -104,9 +227,7 @@ class CatBusDaemon:
                     "description": cap.meta.get("description", ""),
                     "input_schema": cap.meta.get("input_schema", {}),
                 })
-        # 老格式 skills 也加入
         for s in self.config.skills:
-            # 避免重复
             if not any(d["name"] == s.name for d in skills_data):
                 skills_data.append({
                     "name": s.name,
@@ -120,16 +241,15 @@ class CatBusDaemon:
             "data": {
                 "name": self.config.node_name or f"node-{self.node_id[:6]}",
                 "capabilities": caps_data,
-                "skills": skills_data,   # 向后兼容
+                "skills": skills_data,
                 "limits": self.config.limits,
             },
         })
 
         cap_names = [c.name for c in self.config.capabilities]
-        log.info(f"📋 Registered capabilities: {cap_names}")
+        log.info(f"📋 Registered: {cap_names}")
 
-    def _get_current_capabilities(self):
-        """Return a sorted tuple of installed skill names."""
+    def _get_current_skill_dirs(self):
         skills_dir = os.path.expanduser('~/.openclaw/workspace/skills')
         try:
             names = [
@@ -141,17 +261,19 @@ class CatBusDaemon:
         return tuple(sorted(names))
 
     async def _heartbeat_loop(self):
-        """Send heartbeat every 30 seconds; re-register on skill change every 5 minutes."""
-        scan_interval = 300
+        """
+        每 30s 心跳。
+        每 5 分钟同时扫描 skill 目录变更 + 模型轻探测。
+        """
         last_scan = time.time()
-        last_capabilities = self._get_current_capabilities()
+        last_skill_dirs = self._get_current_skill_dirs()
 
         while True:
             await asyncio.sleep(30)
 
             ok = await self._ws_send({'type': 'heartbeat', 'node_id': self.node_id})
             if not ok:
-                log.warning("💔 Heartbeat send failed — closing stale connection to trigger reconnect")
+                log.warning("💔 Heartbeat send failed — closing for reconnect")
                 if self.ws:
                     try:
                         await self.ws.close()
@@ -159,16 +281,31 @@ class CatBusDaemon:
                         pass
                 return
 
-            if time.time() - last_scan > scan_interval:
-                last_scan = time.time()
-                current = self._get_current_capabilities()
-                if current != last_capabilities:
-                    log.info('Skill change detected, re-registering...')
-                    last_capabilities = current
-                    await self._send_register()
+            now = time.time()
+            if now - last_scan < SCAN_INTERVAL:
+                continue
+
+            # ── 每 5 分钟：skill + model 同步扫描 ──
+            last_scan = now
+            need_reregister = False
+
+            # Skill 目录变更
+            current_dirs = self._get_current_skill_dirs()
+            if current_dirs != last_skill_dirs:
+                log.info('🔄 Skill change detected')
+                last_skill_dirs = current_dirs
+                need_reregister = True
+
+            # 模型轻探测
+            model_changed = await self._detect_models_light()
+            if model_changed:
+                need_reregister = True
+
+            if need_reregister:
+                log.info('📡 Re-registering with relay...')
+                await self._send_register()
 
     async def _ws_listen(self):
-        """Listen for incoming WebSocket messages."""
         async for raw in self.ws:
             try:
                 msg = json.loads(raw)
@@ -182,35 +319,35 @@ class CatBusDaemon:
                 self.online_nodes = data.get("online_nodes", 0)
                 self.available_skills = data.get("available_skills", 0)
                 log.info(f"📡 Network: {self.online_nodes} nodes, {self.available_skills} skills")
-
             elif msg_type == "heartbeat_ack":
                 self.online_nodes = data.get("online_nodes", 0)
                 self.available_skills = data.get("available_skills", 0)
-
             elif msg_type == "task":
                 asyncio.create_task(self._handle_task(data))
-
             elif msg_type == "result":
                 self._handle_result(data)
-
             elif msg_type == "error":
                 self._handle_error(data)
-
             elif msg_type == "skills_list":
                 self._handle_skills_list(data)
 
     async def _handle_task(self, data: dict):
-        """Execute a task received from the network."""
         request_id = data.get("request_id", "")
-        # 新格式用 capability，老格式用 skill
         capability_name = data.get("capability", "") or data.get("skill", "")
         input_data = data.get("input", {})
 
         log.info(f"📥 Task received: {capability_name} (req: {request_id})")
-
         result = await self.executor.execute(capability_name, input_data)
-
         log.info(f"📤 Task done: {capability_name} — {result.status} ({result.duration_ms}ms)")
+
+        # model/ 任务 Gateway 报错 → 轻探测确认模型是否还在
+        if result.status == "error" and capability_name.startswith("model/"):
+            error_msg = result.error.lower()
+            if any(kw in error_msg for kw in ["gateway", "502", "503", "timeout", "connection"]):
+                log.warning(f"⚠️  Model task failed, triggering re-detect...")
+                changed = await self._detect_models_light()
+                if changed:
+                    await self._send_register()
 
         await self._ws_send({
             "type": "result",
@@ -237,8 +374,7 @@ class CatBusDaemon:
             future.set_result(data)
 
     def _handle_skills_list(self, data: dict):
-        request_id = "_query_skills"
-        future = self._pending.get(request_id)
+        future = self._pending.get("_query_skills")
         if future and not future.done():
             future.set_result(data)
 
@@ -248,35 +384,23 @@ class CatBusDaemon:
                 await asyncio.wait_for(self.ws.send(json.dumps(msg)), timeout=10)
                 return True
             except asyncio.TimeoutError:
-                log.warning("⚠️  ws_send timed out (stale connection?)")
                 self.connected = False
                 return False
-            except websockets.exceptions.ConnectionClosed as e:
-                log.warning(f"⚠️  ws_send failed (connection closed): {e}")
+            except websockets.exceptions.ConnectionClosed:
                 self.connected = False
                 return False
-            except Exception as e:
-                log.warning(f"⚠️  ws_send unexpected error: {e}")
+            except Exception:
                 self.connected = False
                 return False
         return False
 
-    # ─── Outbound Requests (Caller role) ───────────────────────
+    # ─── Outbound Requests ─────────────────────────────────────
 
     async def call_remote(self, capability: str, input_data: dict, timeout: int = 30) -> dict:
-        """
-        Send a REQUEST to the network and wait for RESULT.
-
-        capability 支持：
-          - "model/claude-sonnet-4"（新格式）
-          - "skill/tavily"（新格式）
-          - "echo"（老格式 bare name，relay 会尝试兼容）
-        """
         if not self.connected:
             return {"status": "error", "error": "Not connected to CatBus Server"}
 
         request_id = f"req_{uuid.uuid4().hex[:8]}"
-
         loop = asyncio.get_event_loop()
         future = loop.create_future()
         self._pending[request_id] = future
@@ -287,7 +411,7 @@ class CatBusDaemon:
             "data": {
                 "request_id": request_id,
                 "capability": capability,
-                "skill": capability,   # 向后兼容老版 relay
+                "skill": capability,
                 "input": input_data,
                 "timeout_seconds": timeout,
             },
@@ -304,15 +428,9 @@ class CatBusDaemon:
     async def query_network_skills(self, timeout: int = 5) -> list[dict]:
         if not self.connected:
             return []
-
         future = asyncio.get_event_loop().create_future()
         self._pending["_query_skills"] = future
-
-        await self._ws_send({
-            "type": "query_skills",
-            "node_id": self.node_id,
-        })
-
+        await self._ws_send({"type": "query_skills", "node_id": self.node_id})
         try:
             result = await asyncio.wait_for(future, timeout=timeout)
             return result.get("skills", [])
@@ -321,7 +439,7 @@ class CatBusDaemon:
         finally:
             self._pending.pop("_query_skills", None)
 
-    # ─── HTTP API (for OpenClaw Skill to call) ─────────────────
+    # ─── HTTP API ──────────────────────────────────────────────
 
     def create_http_app(self) -> web.Application:
         app = web.Application()
@@ -329,6 +447,7 @@ class CatBusDaemon:
         app.router.add_get("/status", self._http_status)
         app.router.add_get("/network/skills", self._http_network_skills)
         app.router.add_post("/request", self._http_request)
+        app.router.add_post("/detect", self._http_detect)
         return app
 
     async def _http_health(self, request: web.Request) -> web.Response:
@@ -342,11 +461,11 @@ class CatBusDaemon:
             "server": self.config.server,
             "online_nodes": self.online_nodes,
             "available_skills": self.available_skills,
-            # 新格式
             "my_capabilities": [c.name for c in self.config.capabilities],
-            # 向后兼容
             "my_skills": [s.name for s in self.config.skills]
                          + [c.short_name for c in self.config.capabilities if c.type == "skill"],
+            "detected_models": [c.name for c in self._detected_models],
+            "last_model_detect": self._last_model_detect,
             "uptime_seconds": int(time.time() - self.start_time),
         })
 
@@ -358,29 +477,34 @@ class CatBusDaemon:
         try:
             body = await request.json()
         except json.JSONDecodeError:
-            return web.json_response(
-                {"status": "error", "error": "Invalid JSON"},
-                status=400,
-            )
+            return web.json_response({"status": "error", "error": "Invalid JSON"}, status=400)
 
-        # 新格式用 capability，老格式用 skill/task
         capability = body.get("capability", "") or body.get("skill", "")
         input_data = body.get("input", {})
         timeout = body.get("timeout", 30)
 
-        # 兼容 SKILL.md 的极简 {"task": "xxx"} 格式
         if not capability and "task" in body:
             capability = "agent"
             input_data = {"task": body["task"]}
-
         if not capability:
             return web.json_response(
-                {"status": "error", "error": "Missing 'capability' or 'skill' field"},
-                status=400,
-            )
+                {"status": "error", "error": "Missing 'capability' or 'skill' field"}, status=400)
 
         result = await self.call_remote(capability, input_data, timeout)
         return web.json_response(result)
+
+    async def _http_detect(self, request: web.Request) -> web.Response:
+        """POST /detect — 手动触发完整探测。"""
+        log.info("🔍 Manual detect triggered via HTTP")
+        await self._detect_models_full()
+        await self._send_register()
+        return web.json_response({
+            "ok": True,
+            "detected": [
+                {"name": c.name, "method": c.meta.get("detection_method", "")}
+                for c in self._detected_models
+            ],
+        })
 
     # ─── Run ───────────────────────────────────────────────────
 
@@ -389,6 +513,11 @@ class CatBusDaemon:
         log.info(f"   Node ID: {self.node_id}")
         log.info(f"   Server:  {self.config.server}")
         log.info(f"   HTTP:    http://localhost:{self.config.port}")
+
+        # 启动时完整探测
+        log.info("🔍 Startup model detection...")
+        await self._detect_models_full()
+
         cap_names = [c.name for c in self.config.capabilities]
         log.info(f"   Capabilities: {cap_names}")
 
