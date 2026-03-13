@@ -32,7 +32,7 @@ echo "   Relay       : $RELAY_URL"
 echo ""
 
 # ── Step 1: OpenClaw workspace check ────────────────────────────
-echo "📦 Step 1/3 — Installing OpenClaw skill..."
+echo "📦 Step 1/4 — Installing OpenClaw skill..."
 
 WS="${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}"
 if [ ! -d "$WS" ]; then
@@ -48,7 +48,7 @@ echo "   ✓ Skill installed → $SKILL_DIR/SKILL.md"
 
 # ── Step 2: pip install ──────────────────────────────────────────
 echo ""
-echo "🐍 Step 2/3 — Installing catbus pip package..."
+echo "🐍 Step 2/4 — Installing catbus pip package..."
 
 if ! command -v pip3 &>/dev/null && ! command -v pip &>/dev/null; then
   echo "   ✗ pip not found. Install Python 3.10+ first: https://python.org"
@@ -61,7 +61,7 @@ echo "   ✓ catbus $(python3 -c 'import catbus; print(catbus.__version__)' 2>/d
 
 # ── Step 3: Init config ──────────────────────────────────────────
 echo ""
-echo "⚙️  Step 3/3 — Initializing CatBus config..."
+echo "⚙️  Step 3/4 — Initializing CatBus config..."
 
 catbus init
 
@@ -78,20 +78,23 @@ else
   echo "   ⚠️  Config not found — relay URL not patched"
 fi
 
+# ── Step 4: Start daemon ─────────────────────────────────────────
+echo ""
+echo "🚀 Step 4/4 — Starting CatBus daemon..."
+catbus serve --daemon
+echo "   ✓ Daemon started"
+
 # ── Done ─────────────────────────────────────────────────────────
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "✅ CatBus installed!"
+echo "✅ CatBus installed and running!"
 echo ""
 echo "Next steps:"
 echo ""
-echo "  1. Start the daemon:"
-echo "     catbus serve --daemon"
-echo ""
-echo "  2. Register your OpenClaw skills:"
+echo "  1. Register your OpenClaw skills:"
 echo "     catbus scan --add"
 echo ""
-echo "  3. Check network status:"
+echo "  2. Check network status:"
 echo "     catbus status"
 echo ""
 if [ "$ENV" = "dev" ]; then
