@@ -14,11 +14,14 @@ fail()  { echo -e "${RED}❌${NC} $*"; exit 1; }
 
 # ---- 参数解析 ----
 BIND_CODE=""
+RELAY_URL=""
 UNINSTALL=false
 while [ $# -gt 0 ]; do
   case "$1" in
     --bindcode=*) BIND_CODE="${1#*=}"; shift ;;
     --bindcode)   BIND_CODE="${2:-}"; shift 2 ;;
+    --relay=*)    RELAY_URL="${1#*=}"; shift ;;
+    --relay)      RELAY_URL="${2:-}"; shift 2 ;;
     --uninstall)  UNINSTALL=true; shift ;;
     *) shift ;;
   esac
@@ -106,6 +109,20 @@ if [ ! -f "$HOME/.catbus/config.yaml" ]; then
   ok "初始化完成，node_id 已生成"
 else
   info "CatBus 已初始化，跳过"
+fi
+
+# ---- 设置 relay（如果指定了 --relay） ----
+if [ -n "$RELAY_URL" ]; then
+  info "设置 relay：$RELAY_URL"
+  python3 -c "
+import yaml, os
+cfg_path = os.path.expanduser('~/.catbus/config.yaml')
+with open(cfg_path) as f:
+    cfg = yaml.safe_load(f) or {}
+cfg['server_url'] = '$RELAY_URL'
+with open(cfg_path, 'w') as f:
+    yaml.dump(cfg, f)
+" 2>/dev/null && ok "relay 已更新" || warn "relay 更新失败，请手动修改 ~/.catbus/config.yaml"
 fi
 
 # ---- 启动 daemon（已运行则跳过） ----
