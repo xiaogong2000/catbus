@@ -109,13 +109,13 @@ else
 fi
 
 # ---- 启动 daemon（已运行则跳过） ----
-if curl -s --max-time 2 http://localhost:8767/health &>/dev/null; then
+if curl -s --max-time 2 http://localhost:9800/health &>/dev/null; then
   ok "CatBus daemon 已在运行"
 else
   info "启动 CatBus daemon..."
   catbus serve --daemon 2>/dev/null || true
   sleep 3
-  if curl -s --max-time 3 http://localhost:8767/health &>/dev/null; then
+  if curl -s --max-time 3 http://localhost:9800/health &>/dev/null; then
     ok "CatBus daemon 已启动"
   else
     fail "daemon 启动失败，请手动运行：catbus serve --daemon"
@@ -132,7 +132,7 @@ if [ -n "$BIND_CODE" ]; then
   node_id=""
   retry=0
   while [ $retry -lt 10 ]; do
-    node_id=$(curl -s http://localhost:8767/status 2>/dev/null \
+    node_id=$(curl -s http://localhost:9800/status 2>/dev/null \
       | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('node_id',''))" 2>/dev/null || true)
     [ -n "$node_id" ] && break
     sleep 1; retry=$((retry+1))
