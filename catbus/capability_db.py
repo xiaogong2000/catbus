@@ -22,6 +22,14 @@ COST_TIER_ORDER_DESC = {"premium": 0, "high": 1, "medium": 2, "low": 3, "free": 
 # patterns = 用于模糊匹配的关键词列表
 
 MODEL_DB: dict[str, dict] = {
+    "claude-opus-4-6": {
+        "provider": "anthropic",
+        "context_window": 200000,
+        "strengths": ["code", "analysis", "writing", "reasoning", "general"],
+        "cost_tier": "premium",
+        "arena_elo": 1550,
+        "patterns": ["claude-opus-4-6", "opus-4-6", "claude.opus.4.6"],
+    },
     "claude-opus-4": {
         "provider": "anthropic",
         "context_window": 200000,
