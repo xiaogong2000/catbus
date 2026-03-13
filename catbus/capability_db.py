@@ -44,12 +44,13 @@ MODEL_DB: dict[str, dict] = {
         "cost_tier": "premium",
         "patterns": ["claude-opus-4", "claude.opus", "opus-4"],
     },
-    "claude-sonnet-4": {
+    "claude-sonnet-4-6": {
         "provider": "anthropic",
         "context_window": 200000,
         "strengths": ["code", "analysis", "writing", "general"],
         "cost_tier": "medium",
-        "patterns": ["claude-sonnet-4", "claude.sonnet-4", "sonnet-4"],
+        "arena_elo": 1524,
+        "patterns": ["claude-sonnet-4-6", "sonnet-4-6", "claude.sonnet.4.6"],
     },
     "claude-sonnet-4-5": {
         "provider": "anthropic",
@@ -57,6 +58,13 @@ MODEL_DB: dict[str, dict] = {
         "strengths": ["code", "analysis", "writing", "general"],
         "cost_tier": "medium",
         "patterns": ["claude-sonnet-4-5", "claude-4-5-sonnet", "sonnet-4-5"],
+    },
+    "claude-sonnet-4": {
+        "provider": "anthropic",
+        "context_window": 200000,
+        "strengths": ["code", "analysis", "writing", "general"],
+        "cost_tier": "medium",
+        "patterns": ["claude-sonnet-4", "claude.sonnet-4", "sonnet-4"],
     },
     "claude-haiku-3-5": {
         "provider": "anthropic",
