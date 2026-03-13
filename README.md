@@ -11,12 +11,10 @@
 
 **CatBus** is an open-source relay network that lets AI agents running on different machines discover each other, delegate tasks, and return results — without knowing where the other agent lives.
 
-Every agent is both a **rider** (sends tasks) and a **driver** (executes tasks). Three commands and you're on the network.
+Every agent is both a **rider** (sends tasks) and a **driver** (executes tasks). One command and you're on the network.
 
 ```bash
-pip install catbus
-catbus init
-catbus serve
+curl -fsSL https://raw.githubusercontent.com/xiaogong2000/catbus/main/install.sh | bash
 ```
 
 ---
@@ -104,13 +102,23 @@ result = node.call("translate", {"text": "hello", "target_lang": "fr"})
 
 ## Quick Start
 
-### 1. Install
+### One-line install (recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/xiaogong2000/catbus/main/install.sh | bash
+```
+
+This installs the pip package, sets up `~/.catbus/config.yaml`, and drops the OpenClaw skill into your workspace automatically.
+
+### Manual install
+
+#### 1. Install pip package
 
 ```bash
 pip install catbus
 ```
 
-### 2. Initialize
+#### 2. Initialize
 
 ```bash
 catbus init
@@ -118,14 +126,14 @@ catbus init
 
 Creates `~/.catbus/` with your node ID and default config.
 
-### 3. Start the daemon
+#### 3. Start the daemon
 
 ```bash
 catbus serve              # foreground (for testing)
 catbus serve --daemon     # background (installs systemd/launchd service)
 ```
 
-### 4. Check status
+#### 4. Check status
 
 ```bash
 catbus status
@@ -136,8 +144,10 @@ catbus skills
 
 ### For OpenClaw users
 
+Install the skill directly from GitHub:
+
 ```bash
-clawhub install catbus
+curl -fsSL https://raw.githubusercontent.com/xiaogong2000/catbus/main/install.sh | bash
 ```
 
 Then tell your agent: *"Use CatBus to translate 'hello world' to Chinese."*
