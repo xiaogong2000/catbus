@@ -22,6 +22,21 @@ COST_TIER_ORDER_DESC = {"premium": 0, "high": 1, "medium": 2, "low": 3, "free": 
 # patterns = 用于模糊匹配的关键词列表
 
 MODEL_DB: dict[str, dict] = {
+    "claude-opus-4-6": {
+        "provider": "anthropic",
+        "context_window": 200000,
+        "strengths": ["code", "analysis", "writing", "reasoning", "general"],
+        "cost_tier": "premium",
+        "arena_elo": 1550,
+        "patterns": ["claude-opus-4-6", "opus-4-6", "claude.opus.4.6"],
+    },
+    "claude-opus-4-5": {
+        "provider": "anthropic",
+        "context_window": 200000,
+        "strengths": ["code", "analysis", "writing", "reasoning", "general"],
+        "cost_tier": "premium",
+        "patterns": ["claude-opus-4-5", "opus-4-5", "claude.opus.4.5"],
+    },
     "claude-opus-4": {
         "provider": "anthropic",
         "context_window": 200000,
@@ -29,12 +44,13 @@ MODEL_DB: dict[str, dict] = {
         "cost_tier": "premium",
         "patterns": ["claude-opus-4", "claude.opus", "opus-4"],
     },
-    "claude-sonnet-4": {
+    "claude-sonnet-4-6": {
         "provider": "anthropic",
         "context_window": 200000,
         "strengths": ["code", "analysis", "writing", "general"],
         "cost_tier": "medium",
-        "patterns": ["claude-sonnet-4", "claude.sonnet-4", "sonnet-4"],
+        "arena_elo": 1524,
+        "patterns": ["claude-sonnet-4-6", "sonnet-4-6", "claude.sonnet.4.6"],
     },
     "claude-sonnet-4-5": {
         "provider": "anthropic",
@@ -43,12 +59,26 @@ MODEL_DB: dict[str, dict] = {
         "cost_tier": "medium",
         "patterns": ["claude-sonnet-4-5", "claude-4-5-sonnet", "sonnet-4-5"],
     },
+    "claude-sonnet-4": {
+        "provider": "anthropic",
+        "context_window": 200000,
+        "strengths": ["code", "analysis", "writing", "general"],
+        "cost_tier": "medium",
+        "patterns": ["claude-sonnet-4", "claude.sonnet-4", "sonnet-4"],
+    },
     "claude-haiku-3-5": {
         "provider": "anthropic",
         "context_window": 200000,
         "strengths": ["fast", "general"],
         "cost_tier": "low",
         "patterns": ["claude-haiku", "claude.haiku", "haiku-3"],
+    },
+    "gpt-4.1": {
+        "provider": "openai",
+        "context_window": 1000000,
+        "strengths": ["code", "general", "long-context"],
+        "cost_tier": "medium",
+        "patterns": ["gpt-4.1"],
     },
     "gpt-4o": {
         "provider": "openai",
@@ -149,10 +179,16 @@ def extract_base_model(raw_name: str) -> str:
     if "/" in name:
         name = name.rsplit("/", 1)[-1]
     if "." in name:
-        # "global.anthropic.claude-sonnet-4-6" → 尝试从右往左找匹配
-        parts = name.split(".")
-        # 从最后一段开始尝试匹配
-        name = parts[-1]
+        # 先检查当前字符串是否已能直接 pattern 匹配（如 gpt-5.4、gpt-4.1-mini 含点版本号）
+        # 只有匹配不上时才做点号分割（处理 anthropic.claude-sonnet-4-6 这类前缀）
+        _direct_match = any(
+            pattern in name
+            for _, info in MODEL_DB.items()
+            for pattern in info.get("patterns", [])
+        )
+        if not _direct_match:
+            parts = name.split(".")
+            name = parts[-1]
 
     # 2. 精确匹配
     if name in MODEL_DB:
