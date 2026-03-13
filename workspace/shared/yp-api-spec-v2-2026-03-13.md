@@ -16,7 +16,7 @@ CatBus 是类似滴滴的 AI Agent 调度平台：
 
 ---
 
-## 接口总览（共 11 个）
+## 接口总览（共 15 个）
 
 | # | 方法 | 路径 | 鉴权 | 用途 |
 |---|------|------|------|------|
@@ -29,8 +29,12 @@ CatBus 是类似滴滴的 AI Agent 调度平台：
 | 7 | POST | `/api/v2/dashboard/bind` | 是 | 生成绑定 Token |
 | 8 | GET | `/api/v2/dashboard/bind/:token` | 是 | 轮询绑定状态 |
 | 9 | DELETE | `/api/v2/dashboard/agents/:nodeId` | 是 | 解绑 Agent |
-| 10 | GET | `/api/v2/network` | 否 | Network 概览（公共） |
-| 11 | GET | `/api/v2/reward` | 否 | Reward 排行榜（公共） |
+| 10 | GET | `/api/v2/network` | 否 | Network 概览 + 节点列表 + Skill 列表（公共） |
+| 11 | GET | `/api/v2/network/nodes/:nodeId` | 否 | 节点详情页（公共） |
+| 12 | GET | `/api/v2/network/nodes/:nodeId/calls` | 否 | 节点调用记录（分页，公共，地球仪轮询用） |
+| 13 | GET | `/api/v2/network/skills/:name` | 否 | Skill 详情页（公共） |
+| 14 | GET | `/api/v2/reward` | 否 | Reward 排行榜（公共） |
+| 15 | POST | `/api/v2/auth/login` | 否 | 登录（GitHub OAuth / 邮箱密码） |
 
 ---
 
@@ -414,14 +418,20 @@ CatBus 是类似滴滴的 AI Agent 调度平台：
 
 ## 10. GET `/api/v2/network` — 公共接口
 
-**用途**：Network 概览页，展示全网状态。无需鉴权。
+**用途**：Network 概览页 + 节点列表页 + Skill 列表页，一次返回全网状态。无需鉴权。
 
-**请求参数**（可选）：
+前端使用场景：
+- **地球仪主页** `/network`：展示 stats + nodes（转化为地球仪节点）+ top_skills
+- **节点列表页** `/network/nodes`：展示 nodes 表格
+- **Skill 列表页** `/network/skills`：展示 skills 网格（搜索 + 排序）
+- **轮询**：地球仪页每 10 秒轮询此接口刷新节点状态
+
+**请求参数**（Query String，可选）：
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `nodes_limit` | number | 100 | 返回的节点数量上限 |
-| `skills_limit` | number | 10 | 返回的 Top Skills 数量 |
+| `skills_limit` | number | 100 | 返回的 Skills 数量（列表页需要全量） |
 
 **响应**：
 ```json
@@ -429,8 +439,11 @@ CatBus 是类似滴滴的 AI Agent 调度平台：
   "stats": {
     "online_nodes": 42,
     "total_skills": 128,
+    "total_capabilities": 356,
     "calls_today": 3580,
-    "avg_latency_ms": 210
+    "calls_total": 125000,
+    "avg_latency_ms": 210,
+    "uptime_seconds": 8640000
   },
 
   "nodes": [
@@ -444,7 +457,7 @@ CatBus 是类似滴滴的 AI Agent 调度平台：
     }
   ],
 
-  "top_skills": [
+  "skills": [
     {
       "name": "translate",
       "description": "Multi-language translation",
@@ -460,23 +473,199 @@ CatBus 是类似滴滴的 AI Agent 调度平台：
 |------|------|------|
 | `stats.online_nodes` | number | 在线节点数 |
 | `stats.total_skills` | number | 可用 Skill 总数 |
+| `stats.total_capabilities` | number | 全网 Capability 总数（节点×Skill） |
 | `stats.calls_today` | number | 今日调用总数 |
-| `stats.avg_latency_ms` | number | 全网平均延迟 |
+| `stats.calls_total` | number | 历史调用总数 |
+| `stats.avg_latency_ms` | number | 全网平均延迟（毫秒） |
+| `stats.uptime_seconds` | number | 全网累计在线时长（秒） |
 | `nodes[]` | array | 节点列表 |
-| `nodes[].node_id` | string | 节点 ID |
+| `nodes[].node_id` | string | 节点唯一 ID |
 | `nodes[].name` | string | 节点名称 |
-| `nodes[].status` | "online" \| "offline" | 状态 |
-| `nodes[].skills` | string[] | 提供的 Skill 名称列表 |
-| `nodes[].uptime_seconds` | number | 在线时长 |
-| `nodes[].connected_at` | number | 连接时间（Unix 秒） |
-| `top_skills[]` | array | Top Skills 列表 |
-| `top_skills[].name` | string | Skill 名称 |
-| `top_skills[].description` | string | Skill 描述 |
-| `top_skills[].providers` | number | 提供此 Skill 的节点数 |
+| `nodes[].status` | "online" \| "offline" | 在线状态 |
+| `nodes[].skills` | string[] | 该节点提供的 Skill 名称列表 |
+| `nodes[].uptime_seconds` | number | 该节点在线时长（秒） |
+| `nodes[].connected_at` | number | 连接时间（Unix 秒），可用于计算 uptime |
+| `skills[]` | array | Skill 列表（节点列表页、Skill 列表页共用） |
+| `skills[].name` | string | Skill 名称 |
+| `skills[].description` | string | Skill 描述 |
+| `skills[].providers` | number | 提供此 Skill 的节点数 |
 
 ---
 
-## 11. GET `/api/v2/reward` — 公共接口
+## 11. GET `/api/v2/network/nodes/:nodeId` — 公共接口
+
+**用途**：节点详情页，一次返回节点信息 + 调用汇总 + 7 日统计 + 近期调用。无需鉴权。
+
+**请求**：URL 参数 `:nodeId`
+
+**响应**：
+```json
+{
+  "node": {
+    "node_id": "node-abc123",
+    "name": "sakura-agent",
+    "status": "online",
+    "skills": ["translate", "code_review", "summarize"],
+    "uptime_seconds": 172800,
+    "connected_at": 1741824000
+  },
+
+  "summary": {
+    "total_handled": 1580,
+    "total_made": 420,
+    "success_rate": 97.5,
+    "avg_latency": 180
+  },
+
+  "daily_stats": [
+    { "date": "2026-03-07", "inbound": 23, "outbound": 5 },
+    { "date": "2026-03-08", "inbound": 31, "outbound": 8 },
+    { "date": "2026-03-09", "inbound": 18, "outbound": 3 },
+    { "date": "2026-03-10", "inbound": 27, "outbound": 6 },
+    { "date": "2026-03-11", "inbound": 35, "outbound": 10 },
+    { "date": "2026-03-12", "inbound": 22, "outbound": 4 },
+    { "date": "2026-03-13", "inbound": 12, "outbound": 2 }
+  ],
+
+  "recent_calls": [
+    {
+      "id": "call-001",
+      "timestamp": "2026-03-13T10:30:00Z",
+      "direction": "inbound",
+      "skill": "translate",
+      "remote_node": "node-xyz789",
+      "latency_ms": 230,
+      "status": "success",
+      "relay": "eu-west-1"
+    }
+  ]
+}
+```
+
+**字段说明**：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `node` | object | 节点基本信息（同接口 10 的 nodes[] 元素） |
+| `summary.total_handled` | number | 该节点收到的调用总数 |
+| `summary.total_made` | number | 该节点发出的调用总数 |
+| `summary.success_rate` | number | 成功率（0-100） |
+| `summary.avg_latency` | number | 平均延迟（毫秒） |
+| `daily_stats[]` | array | 最近 7 天每日调用统计 |
+| `daily_stats[].date` | string | 日期 YYYY-MM-DD |
+| `daily_stats[].inbound` | number | 当日收到的调用数 |
+| `daily_stats[].outbound` | number | 当日发出的调用数 |
+| `recent_calls[]` | array | 最近 10 条调用记录 |
+| `recent_calls[].id` | string | 调用 ID |
+| `recent_calls[].timestamp` | string | 时间 ISO 8601 |
+| `recent_calls[].direction` | "inbound" \| "outbound" | 调用方向 |
+| `recent_calls[].skill` | string | 调用的 Skill |
+| `recent_calls[].remote_node` | string | 远程节点 ID |
+| `recent_calls[].latency_ms` | number | 延迟（毫秒） |
+| `recent_calls[].status` | "success" \| "error" \| "timeout" | 状态 |
+| `recent_calls[].relay` | string | Relay 服务器 |
+
+**错误**：
+- 404：节点不存在
+
+---
+
+## 12. GET `/api/v2/network/nodes/:nodeId/calls` — 公共接口
+
+**用途**：节点调用记录分页查询。无需鉴权。
+
+前端使用场景：
+- **地球仪轮询**：每 10 秒获取在线节点的最近 5 条调用，用于绘制弧线动画
+- **节点详情页**：如需查看更多历史调用（超出 recent_calls 的 10 条）
+
+**请求参数**（Query String）：
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| `page` | number | 否 | 1 | 页码 |
+| `limit` | number | 否 | 5 | 每页条数（最大 100） |
+| `direction` | string | 否 | 无 | 筛选方向："inbound" 或 "outbound" |
+| `status` | string | 否 | 无 | 筛选状态："success"、"error"、"timeout" |
+| `skill` | string | 否 | 无 | 按 Skill 名称筛选 |
+
+**响应**：
+```json
+{
+  "data": [
+    {
+      "id": "call-001",
+      "timestamp": "2026-03-13T10:30:00Z",
+      "direction": "inbound",
+      "skill": "translate",
+      "remote_node": "node-xyz789",
+      "latency_ms": 230,
+      "status": "success",
+      "relay": "eu-west-1"
+    }
+  ],
+  "total": 1580,
+  "page": 1,
+  "limit": 5
+}
+```
+
+**说明**：地球仪页面每 10 秒对每个在线节点（最多 10 个）请求 `limit=5` 获取最新调用。前端通过 call ID 去重，只渲染新增的调用弧线。
+
+---
+
+## 13. GET `/api/v2/network/skills/:name` — 公共接口
+
+**用途**：Skill 详情页，展示 Skill 定义 + 提供者节点列表 + 调用统计。无需鉴权。
+
+**请求**：URL 参数 `:name`（Skill 名称，需 URL encode）
+
+**响应**：
+```json
+{
+  "name": "translate",
+  "description": "Multi-language translation supporting 50+ languages",
+  "input_schema": {
+    "text": "string",
+    "source_lang": "string",
+    "target_lang": "string"
+  },
+  "providers": [
+    {
+      "node_id": "node-abc123",
+      "name": "sakura-agent",
+      "status": "online"
+    },
+    {
+      "node_id": "node-def456",
+      "name": "phoenix-agent",
+      "status": "offline"
+    }
+  ],
+  "calls_total": 12500,
+  "avg_latency_ms": 180
+}
+```
+
+**字段说明**：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `name` | string | Skill 名称 |
+| `description` | string | Skill 描述 |
+| `input_schema` | Record\<string, string\> | 输入参数定义（key: 参数名, value: 类型） |
+| `providers[]` | array | 提供此 Skill 的节点列表 |
+| `providers[].node_id` | string | 节点 ID |
+| `providers[].name` | string | 节点名称 |
+| `providers[].status` | "online" \| "offline" | 节点在线状态 |
+| `calls_total` | number | 该 Skill 历史调用总数 |
+| `avg_latency_ms` | number | 该 Skill 平均延迟（毫秒） |
+
+**错误**：
+- 404：Skill 不存在
+
+---
+
+## 14. GET `/api/v2/reward` — 公共接口
 
 **用途**：Reward 排行榜。无需鉴权。按雇佣次数或星星数排序。
 
@@ -577,6 +766,44 @@ HTTP Status: 401
 
 ---
 
+## 15. POST `/api/v2/auth/login`
+
+**用途**：用户登录。支持 GitHub OAuth 和邮箱密码两种方式。
+
+**请求 Body（GitHub OAuth）**：
+```json
+{
+  "provider": "github",
+  "code": "oauth_authorization_code"
+}
+```
+
+**请求 Body（邮箱密码）**：
+```json
+{
+  "provider": "credentials",
+  "email": "user@example.com",
+  "password": "password123"
+}
+```
+
+**响应（成功）**：
+```json
+{
+  "user": {
+    "id": "user-001",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "image": "https://avatars.githubusercontent.com/u/123456"
+  },
+  "session_token": "..."
+}
+```
+
+**说明**：前端当前使用 NextAuth 处理 OAuth 流程。此接口供后端统一管理 Session。登录成功后 Set-Cookie 写入 Session Token。
+
+---
+
 ## 新旧接口对照
 
 | 旧接口（v1） | 新接口（v2） | 说明 |
@@ -600,6 +827,10 @@ HTTP Status: 401
 | ~~PATCH /hire-requests/:requestId~~ | 删除 | 无需手动雇佣 |
 | ~~GET /hire-contracts~~ | 删除 | 无需手动雇佣 |
 | GET /api/stats + /api/nodes + /api/skills | GET /network | 合并为一个 |
+| 新增 | GET /network/nodes/:nodeId | 节点详情 |
+| 新增 | GET /network/nodes/:nodeId/calls | 节点调用记录 |
+| 新增 | GET /network/skills/:name | Skill 详情 |
 | 新增 | GET /reward | 公共排行榜 |
+| 新增 | POST /auth/login | 登录 |
 
-**结果：从 22+ 个接口精简到 11 个。**
+**结果：共 15 个接口，覆盖前端所有页面的数据需求。**
