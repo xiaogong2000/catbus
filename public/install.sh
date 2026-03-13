@@ -119,10 +119,11 @@ import yaml, os
 cfg_path = os.path.expanduser('~/.catbus/config.yaml')
 with open(cfg_path) as f:
     cfg = yaml.safe_load(f) or {}
-cfg['server_url'] = '$RELAY_URL'
+cfg['server'] = '$RELAY_URL'       # daemon 读取的字段
+cfg['server_url'] = '$RELAY_URL'   # 兼容旧字段名
 with open(cfg_path, 'w') as f:
     yaml.dump(cfg, f)
-" 2>/dev/null && ok "relay 已更新" || warn "relay 更新失败，请手动修改 ~/.catbus/config.yaml"
+" 2>/dev/null && ok "relay 已更新为 $RELAY_URL" || warn "relay 更新失败，请手动修改 ~/.catbus/config.yaml"
 fi
 
 # ---- 启动 daemon（已运行则跳过） ----
@@ -139,25 +140,92 @@ else
   fi
 fi
 
+# ---- 设置开机自启 ----
+CATBUS_BIN=$(command -v catbus 2>/dev/null || echo "$HOME/.local/bin/catbus")
+if [ "$(uname)" = "Darwin" ]; then
+  PLIST="$HOME/Library/LaunchAgents/com.catbus.network.plist"
+  if [ ! -f "$PLIST" ]; then
+    mkdir -p "$HOME/Library/LaunchAgents"
+    cat > "$PLIST" << EOPLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.catbus.network</string>
+  <key>ProgramArguments</key><array>
+    <string>$CATBUS_BIN</string><string>serve</string>
+  </array>
+  <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>$HOME/.catbus/catbus.log</string>
+  <key>StandardErrorPath</key><string>$HOME/.catbus/catbus-error.log</string>
+</dict></plist>
+EOPLIST
+    launchctl load "$PLIST" 2>/dev/null && ok "已设置 macOS 开机自启" || warn "开机自启设置失败"
+  fi
+elif [ "$(id -u)" = "0" ]; then
+  # root 用户：用 systemd system service
+  if [ ! -f /etc/systemd/system/catbus-network.service ]; then
+    cat > /etc/systemd/system/catbus-network.service << EOUNIT
+[Unit]
+Description=CatBus Network Daemon
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=simple
+ExecStart=$CATBUS_BIN serve
+Restart=always
+RestartSec=5
+[Install]
+WantedBy=multi-user.target
+EOUNIT
+    systemctl daemon-reload
+    systemctl enable catbus-network
+    ok "已设置 Linux 开机自启（systemd system）"
+  fi
+else
+  # 普通用户：用 systemd user service
+  mkdir -p "$HOME/.config/systemd/user"
+  if [ ! -f "$HOME/.config/systemd/user/catbus-network.service" ]; then
+    cat > "$HOME/.config/systemd/user/catbus-network.service" << EOUNIT
+[Unit]
+Description=CatBus Network Daemon
+After=network.target
+[Service]
+Type=simple
+ExecStart=$CATBUS_BIN serve
+Restart=always
+RestartSec=5
+[Install]
+WantedBy=default.target
+EOUNIT
+    systemctl --user daemon-reload 2>/dev/null
+    systemctl --user enable catbus-network 2>/dev/null && \
+      loginctl enable-linger "$(whoami)" 2>/dev/null && \
+      ok "已设置 Linux 开机自启（systemd user）" || \
+      warn "开机自启设置失败，请手动运行：systemctl --user enable catbus-network"
+  fi
+fi
+
 # ---- 绑定到 catbus.xyz（如果传了 --bindcode） ----
 if [ -n "$BIND_CODE" ]; then
   echo -e "\n${BOLD}🔗 绑定到 catbus.xyz${NC}"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-  # 从 status 接口获取 node_id
-  info "获取 node_id..."
+  # 等待 relay 连接建立（status == "connected"）
+  info "等待节点连接到 relay..."
   node_id=""
   retry=0
-  while [ $retry -lt 10 ]; do
-    node_id=$(curl -s http://localhost:9800/status 2>/dev/null \
-      | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('node_id',''))" 2>/dev/null || true)
-    [ -n "$node_id" ] && break
+  while [ $retry -lt 15 ]; do
+    STATUS_JSON=$(curl -s http://localhost:9800/status 2>/dev/null)
+    STATUS=$(echo "$STATUS_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || true)
+    node_id=$(echo "$STATUS_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('node_id',''))" 2>/dev/null || true)
+    [ "$STATUS" = "connected" ] && [ -n "$node_id" ] && break
     sleep 1; retry=$((retry+1))
   done
 
-  [ -z "$node_id" ] && fail "无法获取 node_id，请确认 daemon 正在运行：catbus serve --daemon"
+  [ -z "$node_id" ] && fail "relay 连接超时，请检查 daemon：catbus serve --daemon"
+  [ "$STATUS" != "connected" ] && fail "relay 未连接（状态：$STATUS），请检查网络"
 
-  info "Node ID: $node_id"
+  info "Node ID: $node_id，已连接 relay"
   info "正在绑定到 catbus.xyz..."
 
   resp=$(curl -s -w "\n%{http_code}" -X POST "https://catbus.xyz/api/v2/dashboard/bind/claim" \
