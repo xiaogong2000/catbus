@@ -2,6 +2,7 @@
 # 🚌 CatBus 安装 + 绑定脚本
 # curl -fsSL https://catbus.xyz/install.sh | bash
 # curl -fsSL https://catbus.xyz/install.sh | bash -s -- --bindcode <code>
+# curl -fsSL https://catbus.xyz/install.sh | bash -s -- --uninstall
 set -uo pipefail
 
 # ---- 颜色 ----
@@ -13,13 +14,64 @@ fail()  { echo -e "${RED}❌${NC} $*"; exit 1; }
 
 # ---- 参数解析 ----
 BIND_CODE=""
+UNINSTALL=false
 while [ $# -gt 0 ]; do
   case "$1" in
     --bindcode=*) BIND_CODE="${1#*=}"; shift ;;
     --bindcode)   BIND_CODE="${2:-}"; shift 2 ;;
+    --uninstall)  UNINSTALL=true; shift ;;
     *) shift ;;
   esac
 done
+
+# ---- 卸载模式 ----
+if [ "$UNINSTALL" = true ]; then
+  echo -e "\n${BOLD}🗑️  CatBus 卸载${NC}"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+  # 停止 daemon
+  info "停止 CatBus daemon..."
+  if command -v catbus &>/dev/null; then
+    catbus serve --stop 2>/dev/null || true
+  fi
+  # 清理 launchd/systemd 服务
+  if [ "$(uname)" = "Darwin" ]; then
+    PLIST="$HOME/Library/LaunchAgents/com.catbus.network.plist"
+    if [ -f "$PLIST" ]; then
+      launchctl unload "$PLIST" 2>/dev/null || true
+      rm -f "$PLIST"
+      info "已移除 launchd 服务"
+    fi
+  else
+    if systemctl list-units --full -all 2>/dev/null | grep -q catbus-network; then
+      systemctl --user stop catbus-network 2>/dev/null || sudo systemctl stop catbus-network 2>/dev/null || true
+      systemctl --user disable catbus-network 2>/dev/null || sudo systemctl disable catbus-network 2>/dev/null || true
+      info "已停止 systemd 服务"
+    fi
+  fi
+  pkill -f "catbus serve" 2>/dev/null || true
+
+  # 卸载 pip 包
+  if command -v catbus &>/dev/null; then
+    info "卸载 catbus pip 包..."
+    PIP=$(command -v pip3 || command -v pip)
+    $PIP uninstall -y catbus 2>/dev/null || \
+      $PIP uninstall -y --break-system-packages catbus 2>/dev/null || true
+    ok "catbus 包已卸载"
+  else
+    info "catbus 未安装，跳过"
+  fi
+
+  # 删除配置目录
+  if [ -d "$HOME/.catbus" ]; then
+    info "删除 ~/.catbus 配置目录..."
+    rm -rf "$HOME/.catbus"
+    ok "配置已清理"
+  fi
+
+  echo -e "\n${GREEN}✅ CatBus 已完全卸载${NC}"
+  exit 0
+fi
 
 echo -e "\n${BOLD}🚌 CatBus 安装${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
