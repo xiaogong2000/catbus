@@ -3,6 +3,9 @@ CatBus Daemon — 本地常驻进程
 
 一头连 CatBus Server（WebSocket），一头对本地暴露 HTTP API（给 Skill 调）。
 同时作为 Caller（发任务）和 Provider（接任务）。
+
+Capability 体系：REGISTER 消息携带 capabilities 列表（type/name 格式），
+同时保留 skills 字段兼容老版 relay。
 """
 
 import asyncio
@@ -25,7 +28,11 @@ class CatBusDaemon:
     def __init__(self, config: Config):
         self.config = config
         self.node_id = config.node_id
-        self.executor = Executor(config.skills)
+        # 新版 Executor：优先使用 capabilities，fallback 到 skills
+        self.executor = Executor(
+            capabilities=config.capabilities,
+            skills=config.skills,
+        )
 
         # WebSocket state
         self.ws = None
@@ -45,8 +52,6 @@ class CatBusDaemon:
         while True:
             try:
                 log.info(f"🔌 Connecting to {self.config.server}...")
-                # ping_interval/ping_timeout: 让 websockets 库主动检测 stale 连接
-                # 30s 发一次 ping，10s 内没收到 pong 则视为断线并抛异常
                 async with websockets.connect(
                     self.config.server,
                     ping_interval=30,
@@ -54,13 +59,11 @@ class CatBusDaemon:
                 ) as ws:
                     self.ws = ws
                     self.connected = True
-                    retry_delay = 5  # reset on success
+                    retry_delay = 5
                     log.info("🟢 Connected to CatBus Server")
 
-                    # Register
                     await self._send_register()
 
-                    # Start heartbeat
                     heartbeat_task = asyncio.create_task(self._heartbeat_loop())
 
                     try:
@@ -88,25 +91,42 @@ class CatBusDaemon:
                 retry_delay = min(retry_delay * 2, 60)
 
     async def _send_register(self):
-        """Send REGISTER message to server."""
-        skills_data = [
-            {
-                "name": s.name,
-                "description": s.description,
-                "input_schema": s.input_schema,
-            }
-            for s in self.config.skills
-        ]
+        """Send REGISTER message to server with capabilities + skills (backward compat)."""
+        # 新格式：capabilities 列表
+        caps_data = [cap.to_register_dict() for cap in self.config.capabilities]
+
+        # 向后兼容：也发 skills 列表（老版 relay 只认 skills）
+        skills_data = []
+        for cap in self.config.capabilities:
+            if cap.type == "skill":
+                skills_data.append({
+                    "name": cap.short_name,
+                    "description": cap.meta.get("description", ""),
+                    "input_schema": cap.meta.get("input_schema", {}),
+                })
+        # 老格式 skills 也加入
+        for s in self.config.skills:
+            # 避免重复
+            if not any(d["name"] == s.name for d in skills_data):
+                skills_data.append({
+                    "name": s.name,
+                    "description": s.description,
+                    "input_schema": s.input_schema,
+                })
+
         await self._ws_send({
             "type": "register",
             "node_id": self.node_id,
             "data": {
                 "name": self.config.node_name or f"node-{self.node_id[:6]}",
-                "skills": skills_data,
+                "capabilities": caps_data,
+                "skills": skills_data,   # 向后兼容
+                "limits": self.config.limits,
             },
         })
-        skill_names = [s.name for s in self.config.skills]
-        log.info(f"📋 Registered skills: {skill_names}")
+
+        cap_names = [c.name for c in self.config.capabilities]
+        log.info(f"📋 Registered capabilities: {cap_names}")
 
     def _get_current_capabilities(self):
         """Return a sorted tuple of installed skill names."""
@@ -122,14 +142,13 @@ class CatBusDaemon:
 
     async def _heartbeat_loop(self):
         """Send heartbeat every 30 seconds; re-register on skill change every 5 minutes."""
-        scan_interval = 300  # 5 分钟
+        scan_interval = 300
         last_scan = time.time()
         last_capabilities = self._get_current_capabilities()
 
         while True:
             await asyncio.sleep(30)
 
-            # 心跳 — 发送失败说明连接已断，主动触发重连
             ok = await self._ws_send({'type': 'heartbeat', 'node_id': self.node_id})
             if not ok:
                 log.warning("💔 Heartbeat send failed — closing stale connection to trigger reconnect")
@@ -138,9 +157,8 @@ class CatBusDaemon:
                         await self.ws.close()
                     except Exception:
                         pass
-                return  # 退出 heartbeat_loop，让 ws_connect 重连循环接管
+                return
 
-            # 每 5 分钟检查 skill 变更
             if time.time() - last_scan > scan_interval:
                 last_scan = time.time()
                 current = self._get_current_capabilities()
@@ -170,31 +188,29 @@ class CatBusDaemon:
                 self.available_skills = data.get("available_skills", 0)
 
             elif msg_type == "task":
-                # Incoming task — we are the Provider
                 asyncio.create_task(self._handle_task(data))
 
             elif msg_type == "result":
-                # Result for our outbound request
                 self._handle_result(data)
 
             elif msg_type == "error":
                 self._handle_error(data)
 
             elif msg_type == "skills_list":
-                # Response to query_skills
                 self._handle_skills_list(data)
 
     async def _handle_task(self, data: dict):
         """Execute a task received from the network."""
         request_id = data.get("request_id", "")
-        skill_name = data.get("skill", "")
+        # 新格式用 capability，老格式用 skill
+        capability_name = data.get("capability", "") or data.get("skill", "")
         input_data = data.get("input", {})
 
-        log.info(f"📥 Task received: {skill_name} (req: {request_id})")
+        log.info(f"📥 Task received: {capability_name} (req: {request_id})")
 
-        result = await self.executor.execute(skill_name, input_data)
+        result = await self.executor.execute(capability_name, input_data)
 
-        log.info(f"📤 Task done: {skill_name} — {result.status} ({result.duration_ms}ms)")
+        log.info(f"📤 Task done: {capability_name} — {result.status} ({result.duration_ms}ms)")
 
         await self._ws_send({
             "type": "result",
@@ -209,28 +225,24 @@ class CatBusDaemon:
         })
 
     def _handle_result(self, data: dict):
-        """Handle result for our outbound request."""
         request_id = data.get("request_id", "")
         future = self._pending.get(request_id)
         if future and not future.done():
             future.set_result(data)
 
     def _handle_error(self, data: dict):
-        """Handle error for our outbound request."""
         request_id = data.get("request_id", "")
         future = self._pending.get(request_id)
         if future and not future.done():
             future.set_result(data)
 
     def _handle_skills_list(self, data: dict):
-        """Handle skills list response."""
         request_id = "_query_skills"
         future = self._pending.get(request_id)
         if future and not future.done():
             future.set_result(data)
 
     async def _ws_send(self, msg: dict) -> bool:
-        """Send JSON over WebSocket. Returns True on success, False on failure."""
         if self.ws:
             try:
                 await asyncio.wait_for(self.ws.send(json.dumps(msg)), timeout=10)
@@ -251,31 +263,36 @@ class CatBusDaemon:
 
     # ─── Outbound Requests (Caller role) ───────────────────────
 
-    async def call_remote(self, skill: str, input_data: dict, timeout: int = 30) -> dict:
-        """Send a REQUEST to the network and wait for RESULT."""
+    async def call_remote(self, capability: str, input_data: dict, timeout: int = 30) -> dict:
+        """
+        Send a REQUEST to the network and wait for RESULT.
+
+        capability 支持：
+          - "model/claude-sonnet-4"（新格式）
+          - "skill/tavily"（新格式）
+          - "echo"（老格式 bare name，relay 会尝试兼容）
+        """
         if not self.connected:
             return {"status": "error", "error": "Not connected to CatBus Server"}
 
         request_id = f"req_{uuid.uuid4().hex[:8]}"
 
-        # Create future
         loop = asyncio.get_event_loop()
         future = loop.create_future()
         self._pending[request_id] = future
 
-        # Send request
         await self._ws_send({
             "type": "request",
             "node_id": self.node_id,
             "data": {
                 "request_id": request_id,
-                "skill": skill,
+                "capability": capability,
+                "skill": capability,   # 向后兼容老版 relay
                 "input": input_data,
                 "timeout_seconds": timeout,
             },
         })
 
-        # Wait for result
         try:
             result = await asyncio.wait_for(future, timeout=timeout)
             return result
@@ -285,7 +302,6 @@ class CatBusDaemon:
             self._pending.pop(request_id, None)
 
     async def query_network_skills(self, timeout: int = 5) -> list[dict]:
-        """Query available skills on the network."""
         if not self.connected:
             return []
 
@@ -326,7 +342,11 @@ class CatBusDaemon:
             "server": self.config.server,
             "online_nodes": self.online_nodes,
             "available_skills": self.available_skills,
-            "my_skills": [s.name for s in self.config.skills],
+            # 新格式
+            "my_capabilities": [c.name for c in self.config.capabilities],
+            # 向后兼容
+            "my_skills": [s.name for s in self.config.skills]
+                         + [c.short_name for c in self.config.capabilities if c.type == "skill"],
             "uptime_seconds": int(time.time() - self.start_time),
         })
 
@@ -343,30 +363,35 @@ class CatBusDaemon:
                 status=400,
             )
 
-        skill = body.get("skill", "")
+        # 新格式用 capability，老格式用 skill/task
+        capability = body.get("capability", "") or body.get("skill", "")
         input_data = body.get("input", {})
         timeout = body.get("timeout", 30)
 
-        if not skill:
+        # 兼容 SKILL.md 的极简 {"task": "xxx"} 格式
+        if not capability and "task" in body:
+            capability = "agent"
+            input_data = {"task": body["task"]}
+
+        if not capability:
             return web.json_response(
-                {"status": "error", "error": "Missing 'skill' field"},
+                {"status": "error", "error": "Missing 'capability' or 'skill' field"},
                 status=400,
             )
 
-        result = await self.call_remote(skill, input_data, timeout)
+        result = await self.call_remote(capability, input_data, timeout)
         return web.json_response(result)
 
     # ─── Run ───────────────────────────────────────────────────
 
     async def run(self):
-        """Start both WebSocket client and HTTP server."""
         log.info(f"🚌 CatBus Daemon starting...")
         log.info(f"   Node ID: {self.node_id}")
         log.info(f"   Server:  {self.config.server}")
         log.info(f"   HTTP:    http://localhost:{self.config.port}")
-        log.info(f"   Skills:  {[s.name for s in self.config.skills]}")
+        cap_names = [c.name for c in self.config.capabilities]
+        log.info(f"   Capabilities: {cap_names}")
 
-        # Start HTTP server
         app = self.create_http_app()
         runner = web.AppRunner(app)
         await runner.setup()
@@ -374,5 +399,4 @@ class CatBusDaemon:
         await site.start()
         log.info(f"🌐 HTTP API listening on http://localhost:{self.config.port}")
 
-        # Start WebSocket connection (with auto-reconnect)
         await self.ws_connect()
