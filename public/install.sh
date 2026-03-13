@@ -101,18 +101,18 @@ else
   info "CatBus 已初始化，跳过"
 fi
 
-# ---- 启动 daemon ----
-info "启动 CatBus daemon..."
-catbus serve --daemon 2>/dev/null || true
-sleep 2
-
-# 验证 daemon
-if curl -s --max-time 3 http://localhost:8767/health &>/dev/null; then
-  ok "CatBus daemon 已运行"
+# ---- 启动 daemon（已运行则跳过） ----
+if curl -s --max-time 2 http://localhost:8767/health &>/dev/null; then
+  ok "CatBus daemon 已在运行"
 else
-  warn "daemon 未响应，尝试重启..."
+  info "启动 CatBus daemon..."
   catbus serve --daemon 2>/dev/null || true
   sleep 3
+  if curl -s --max-time 3 http://localhost:8767/health &>/dev/null; then
+    ok "CatBus daemon 已启动"
+  else
+    fail "daemon 启动失败，请手动运行：catbus serve --daemon"
+  fi
 fi
 
 # ---- 绑定到 catbus.xyz（如果传了 --bindcode） ----
