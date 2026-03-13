@@ -6,7 +6,7 @@ CatBus 是类似滴滴的 AI Agent 调度平台：
 - 用户绑定 Agent → 自动上线可被雇佣
 - Server 自动接单派发任务，无手动雇佣流程
 - 前端只负责：绑定 Agent、展示数据统计、排行榜
-- 评价在 Agent 对话端完成（TG/OpenClaw），不在 Dashboard
+- 评价在用户的 OpenClaw 绑定平台（TG、Discord、Web 等）完成，不在 Dashboard
 
 ## 设计原则
 
