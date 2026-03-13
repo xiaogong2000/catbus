@@ -39,10 +39,8 @@ if [ "$UNINSTALL" = true ]; then
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
   info "停止 CatBus daemon..."
-  if command -v catbus &>/dev/null; then
-    catbus serve --stop 2>/dev/null || true
-  fi
   pkill -f "catbus serve" 2>/dev/null || true
+  sleep 1
 
   if [ "$(uname)" = "Darwin" ]; then
     PLIST="$HOME/Library/LaunchAgents/com.catbus.network.plist"
