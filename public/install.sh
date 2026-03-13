@@ -39,6 +39,16 @@ if [ "$UNINSTALL" = true ]; then
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
   info "停止 CatBus daemon..."
+  # 先解绑 catbus.xyz 账户（避免僵尸节点）
+  NODE_ID=$(python3 -c "import yaml,os; cfg=yaml.safe_load(open(os.path.expanduser('~/.catbus/config.yaml'))); print(cfg.get('node_id',''))" 2>/dev/null || true)
+  if [ -n "$NODE_ID" ]; then
+    info "解绑 catbus.xyz 账户中..."
+    curl -s -X POST "https://catbus.xyz/api/v2/dashboard/unbind" \
+      -H "Content-Type: application/json" \
+      -d "{\"node_id\":\"$NODE_ID\"}" 2>/dev/null | python3 -c \
+      "import sys,json; d=json.load(sys.stdin); print('✅ 解绑成功' if d.get('success') else '⚠️  ' + d.get('message',''))" \
+      2>/dev/null || true
+  fi
   pkill -f "catbus serve" 2>/dev/null || true
   sleep 1
 
