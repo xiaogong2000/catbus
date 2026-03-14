@@ -323,7 +323,7 @@ def cmd_ask(args):
     if data.get("status") == "ok":
         output = data.get("output", {})
 
-        # Display provider source info on stderr (unless --quiet)
+        # Display provider source info on stdout (before result), unless --quiet
         if not args.quiet:
             meta = (output if isinstance(output, dict) else {}).get("_catbus_meta") or data.get("_catbus_meta")
             if meta:
@@ -331,7 +331,7 @@ def cmd_ask(args):
                 model = meta.get("model_used") or "unknown"
                 elo = meta.get("arena_elo") or "?"
                 latency = meta.get("latency_ms") or "?"
-                print(f"[CatBus] 由 {node} 响应 ({model}, ELO {elo}, {latency}ms)", file=sys.stderr)
+                print(f"[CatBus] 由 {node} 响应 ({model}, ELO {elo}, {latency}ms)")
 
         if isinstance(output, dict):
             result = output.get("summary") or output.get("output") or output.get("text") or str(output)

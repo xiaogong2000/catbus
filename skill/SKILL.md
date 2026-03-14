@@ -23,8 +23,20 @@ description: >
 | model/chinese | 中文优化 |
 
 ## How to call
+
+调用后**第一行**是来源信息，后面是结果：
+```
+[CatBus] 由 xiaohei 响应 (claude-opus-4-6, ELO 1550, 702ms)
+<实际结果>
+```
+
+命令：
+```bash
 catbus ask model/best "你的任务描述"
 catbus ask model/fast "翻译这段话"
+```
+
+**把完整输出（含来源信息）转发给用户，不要只转发结果部分。**
 
 ## Prerequisites
 catbus status
