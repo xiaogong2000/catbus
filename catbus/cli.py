@@ -36,26 +36,26 @@ def cmd_init(args):
     # 1. Generate node_id
     existing = load_node_id()
     if existing:
-        print(f"🔑 Node ID already exists: {existing}")
+        print("" + "\n" + f"🔑 Node ID already exists: {existing}")
         node_id = existing
     else:
         node_id = generate_node_id()
         save_node_id(node_id)
-        print(f"🔑 Node ID generated: {node_id}")
+        print("" + "\n" + f"🔑 Node ID generated: {node_id}")
 
     config_file = CATBUS_HOME / "config.yaml"
 
     if config_file.exists():
-        print(f"📁 Config already exists: {config_file}")
+        print("" + "\n" + f"📁 Config already exists: {config_file}")
     else:
         config = load_config()
         if not config.node_id:
             config.node_id = node_id
         save_default_config(config)
-        print(f"📁 Config created: {config_file}")
+        print("" + "\n" + f"📁 Config created: {config_file}")
 
     # 2. 探测模型
-    print(f"\n🔍 Detecting installed models...")
+    print("" + "\n" + f"\n🔍 Detecting installed models...")
     detected_caps = []
 
     try:
@@ -64,11 +64,11 @@ def cmd_init(args):
 
         for r in results:
             if r.base_name.startswith("unknown-"):
-                print(f"  📊 Could not identify specific model (tier: {r.cost_tier})")
+                print("" + "\n" + f"  📊 Could not identify specific model (tier: {r.cost_tier})")
                 continue
 
             icon = {"high": "🟢", "medium": "🟡", "low": "🔴"}.get(r.confidence, "⚪")
-            print(f"  {icon} model/{r.base_name} ({r.method}, {r.confidence})")
+            print("" + "\n" + f"  {icon} model/{r.base_name} ({r.method}, {r.confidence})")
             detected_caps.append({
                 "type": "model",
                 "name": f"model/{r.base_name}",
@@ -88,11 +88,11 @@ def cmd_init(args):
             print("     You can add models later: catbus detect")
 
     except Exception as e:
-        print(f"  ⚠️  Detection failed: {e}")
+        print("" + "\n" + f"  ⚠️  Detection failed: {e}")
         print("     You can add models later: catbus detect")
 
     # 3. 扫描 skills
-    print(f"\n🔍 Scanning OpenClaw skills...")
+    print("" + "\n" + f"\n🔍 Scanning OpenClaw skills...")
     scanned_caps = []
 
     try:
@@ -108,13 +108,13 @@ def cmd_init(args):
             })
             shareable = cap.meta.get("shareable", True)
             marker = "✅" if shareable else "🔒"
-            print(f"  {marker} {cap.name}")
+            print("" + "\n" + f"  {marker} {cap.name}")
 
         if not skill_caps:
             print("  ➖ No OpenClaw skills found")
 
     except Exception as e:
-        print(f"  ⚠️  Scan failed: {e}")
+        print("" + "\n" + f"  ⚠️  Scan failed: {e}")
 
     # 4. 写入 config.yaml
     if detected_caps or scanned_caps:
@@ -154,12 +154,12 @@ def cmd_init(args):
 
         model_count = len([c for c in deduped if c["type"] == "model"])
         skill_count = len([c for c in deduped if c["type"] == "skill"])
-        print(f"\n📝 Config updated: {model_count} model(s) + {skill_count} skill(s)")
+        print("" + "\n" + f"\n📝 Config updated: {model_count} model(s) + {skill_count} skill(s)")
 
     # 5. Done
-    print(f"\n✅ CatBus initialized at {CATBUS_HOME}")
-    print(f"   Edit config: {config_file}")
-    print(f"   Start daemon: catbus serve")
+    print("" + "\n" + f"\n✅ CatBus initialized at {CATBUS_HOME}")
+    print("" + "\n" + f"   Edit config: {config_file}")
+    print("" + "\n" + f"   Start daemon: catbus serve")
 
 
 # ─── serve ────────────────────────────────────────────────────
@@ -204,32 +204,32 @@ def cmd_status(args):
         req = urllib.request.Request(url)
         with urllib.request.urlopen(req, timeout=3) as resp:
             data = json.loads(resp.read())
-        print(f"🟢 CatBus Daemon is running")
-        print(f"   Node ID:       {data.get('node_id', '?')}")
-        print(f"   Name:          {data.get('node_name', '?')}")
-        print(f"   Server:        {data.get('server', '?')}")
-        print(f"   Status:        {data.get('status', '?')}")
-        print(f"   Network:       {data.get('online_nodes', 0)} nodes, {data.get('available_skills', 0)} skills")
+        print("" + "\n" + f"🟢 CatBus Daemon is running")
+        print("" + "\n" + f"   Node ID:       {data.get('node_id', '?')}")
+        print("" + "\n" + f"   Name:          {data.get('node_name', '?')}")
+        print("" + "\n" + f"   Server:        {data.get('server', '?')}")
+        print("" + "\n" + f"   Status:        {data.get('status', '?')}")
+        print("" + "\n" + f"   Network:       {data.get('online_nodes', 0)} nodes, {data.get('available_skills', 0)} skills")
 
         caps = data.get("my_capabilities", [])
         if caps:
             models = [c for c in caps if c.startswith("model/")]
             skills = [c for c in caps if c.startswith("skill/")]
             if models:
-                print(f"   Models:        {models}")
+                print("" + "\n" + f"   Models:        {models}")
             if skills:
-                print(f"   Skills:        {skills}")
+                print("" + "\n" + f"   Skills:        {skills}")
         else:
-            print(f"   My skills:     {data.get('my_skills', [])}")
+            print("" + "\n" + f"   My skills:     {data.get('my_skills', [])}")
 
         detected = data.get("detected_models", [])
         if detected:
-            print(f"   Detected:      {detected}")
+            print("" + "\n" + f"   Detected:      {detected}")
 
-        print(f"   Uptime:        {data.get('uptime_seconds', 0)}s")
+        print("" + "\n" + f"   Uptime:        {data.get('uptime_seconds', 0)}s")
     except (urllib.error.URLError, ConnectionRefusedError):
         print("🔴 CatBus Daemon is not running")
-        print(f"   Start with: catbus serve")
+        print("" + "\n" + f"   Start with: catbus serve")
         sys.exit(1)
 
 
@@ -262,7 +262,7 @@ def cmd_call(args):
         try:
             input_data = json.loads(args.input)
         except json.JSONDecodeError:
-            print(f"❌ Invalid JSON input: {args.input}")
+            print("" + "\n" + f"❌ Invalid JSON input: {args.input}")
             sys.exit(1)
 
     payload = json.dumps({
@@ -284,7 +284,7 @@ def cmd_call(args):
         if data.get("status") == "ok":
             print(json.dumps(data.get("output", {}), indent=2, ensure_ascii=False))
         else:
-            print(f"❌ {data.get('error', 'Unknown error')}")
+            print("" + "\n" + f"❌ {data.get('error', 'Unknown error')}")
             sys.exit(1)
 
     except (urllib.error.URLError, ConnectionRefusedError):
@@ -318,12 +318,18 @@ def cmd_ask(args):
         print("[CatBus Error] daemon not running. Run: catbus serve --daemon", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
-        print(f"[CatBus Error] {e}", file=sys.stderr)
+        print(f"[CatBus Error] {data.get('error') or data.get('message') or str(data)}", file=sys.stderr)
         sys.exit(1)
     if data.get("status") == "ok":
         output = data.get("output", {})
 
-        # Display provider source info on stdout (before result), unless --quiet
+        if isinstance(output, dict):
+            result = output.get("summary") or output.get("output") or output.get("text") or str(output)
+        else:
+            result = str(output)
+        print(result)
+
+        # Display provider source info on stdout (after result), unless --quiet
         if not args.quiet:
             meta = (output if isinstance(output, dict) else {}).get("_catbus_meta") or data.get("_catbus_meta")
             if meta:
@@ -331,13 +337,7 @@ def cmd_ask(args):
                 model = meta.get("model_used") or "unknown"
                 elo = meta.get("arena_elo") or "?"
                 latency = meta.get("latency_ms") or "?"
-                print(f"[CatBus] 由 {node} 响应 ({model}, ELO {elo}, {latency}ms)")
-
-        if isinstance(output, dict):
-            result = output.get("summary") or output.get("output") or output.get("text") or str(output)
-        else:
-            result = str(output)
-        print(result)
+                print(f"\n[CatBus] 由 {node} 响应 ({model}, ELO {elo}, {latency}ms)")
     else:
         print(f"[CatBus Error] {data.get('error') or data.get('message') or str(data)}", file=sys.stderr)
         sys.exit(1)
@@ -364,7 +364,7 @@ def cmd_bind(args):
 
         for r in results:
             if r.base_name.startswith("unknown-"):
-                print(f"  ⚠️  Could not identify model (tier: {r.cost_tier})")
+                print("" + "\n" + f"  ⚠️  Could not identify model (tier: {r.cost_tier})")
                 continue
             capabilities.append({
                 "type": "model",
@@ -380,7 +380,7 @@ def cmd_bind(args):
                 },
             })
             icon = {"high": "🟢", "medium": "🟡", "low": "🔴"}.get(r.confidence, "⚪")
-            print(f"  {icon} model/{r.base_name} ({r.method}, {r.confidence})")
+            print("" + "\n" + f"  {icon} model/{r.base_name} ({r.method}, {r.confidence})")
 
     # Manual --models
     if args.models:
@@ -404,14 +404,14 @@ def cmd_bind(args):
                         "arena_elo": info.get("arena_elo", 0),
                     },
                 })
-                print(f"  ✅ model/{base}")
+                print("" + "\n" + f"  ✅ model/{base}")
             else:
                 capabilities.append({
                     "type": "model",
                     "name": f"model/{raw_model}",
                     "meta": {"raw_name": raw_model, "provider": "unknown", "cost_tier": "medium"},
                 })
-                print(f"  ⚠️  model/{raw_model} (unrecognized)")
+                print("" + "\n" + f"  ⚠️  model/{raw_model} (unrecognized)")
 
     # Auto-scan skills
     if args.auto:
@@ -423,7 +423,7 @@ def cmd_bind(args):
             if cap.meta.get("shareable", True) and cap.name != "skill/agent":
                 capabilities.append({"type": "skill", "name": cap.name, "meta": cap.meta})
                 count += 1
-        print(f"  ✅ Found {count} shareable skill(s)")
+        print("" + "\n" + f"  ✅ Found {count} shareable skill(s)")
 
     # Manual --skills
     if args.skills:
@@ -440,11 +440,11 @@ def cmd_bind(args):
                 "name": full_name,
                 "meta": {"category": info.get("category", "utility"), "cost_tier": info.get("cost_tier", "free")},
             })
-            print(f"  ✅ skill/{skill_name}")
+            print("" + "\n" + f"  ✅ skill/{skill_name}")
 
     models = [c for c in capabilities if c["type"] == "model"]
     skills = [c for c in capabilities if c["type"] == "skill"]
-    print(f"\n📋 Total: {len(models)} model(s) + {len(skills)} skill(s)")
+    print("" + "\n" + f"\n📋 Total: {len(models)} model(s) + {len(skills)} skill(s)")
 
     if not capabilities:
         print("⚠️  Nothing to bind. Use --auto or --models/--skills.")
@@ -458,7 +458,7 @@ def cmd_bind(args):
     }).encode()
 
     bind_url = "https://catbus.xyz/api/dashboard/agents/bind"
-    print(f"\n📡 Binding to {bind_url}...")
+    print("" + "\n" + f"\n📡 Binding to {bind_url}...")
 
     try:
         req = urllib.request.Request(
@@ -469,15 +469,15 @@ def cmd_bind(args):
         with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read())
         if data.get("ok") or data.get("success"):
-            print(f"✅ Bound! {len(capabilities)} capabilities registered.")
+            print("" + "\n" + f"✅ Bound! {len(capabilities)} capabilities registered.")
         else:
-            print(f"❌ Bind failed: {data.get('error', 'Unknown')}")
+            print("" + "\n" + f"❌ Bind failed: {data.get('error', 'Unknown')}")
             sys.exit(1)
     except urllib.error.HTTPError as e:
-        print(f"❌ HTTP {e.code}: {e.read().decode()[:200]}")
+        print("" + "\n" + f"❌ HTTP {e.code}: {e.read().decode()[:200]}")
         sys.exit(1)
     except (urllib.error.URLError, ConnectionRefusedError) as e:
-        print(f"❌ Cannot reach {bind_url}: {e}")
+        print("" + "\n" + f"❌ Cannot reach {bind_url}: {e}")
         sys.exit(1)
 
 
@@ -494,13 +494,13 @@ def cmd_scan(args):
     from .scanner import scan_to_capabilities
     entries = scan_to_capabilities()
 
-    print(f"\n🔧 Skills ({len(entries)}):")
+    print("" + "\n" + f"\n🔧 Skills ({len(entries)}):")
     for e in entries:
         shareable = e.meta.get("shareable", True)
         marker = "✅" if shareable else "🔒"
         category = e.meta.get("category", "?")
         desc = e.meta.get("description", "")[:50]
-        print(f"  {marker} {e.name:35s} [{category}] {desc}")
+        print("" + "\n" + f"  {marker} {e.name:35s} [{category}] {desc}")
 
     if args.add:
         _add_capabilities_to_config(entries)
@@ -543,10 +543,10 @@ def _add_capabilities_to_config(new_entries):
         yaml.dump(raw, f, default_flow_style=False, allow_unicode=True)
 
     if added:
-        print(f"  ✅ Added: {sorted(added)}")
+        print("" + "\n" + f"  ✅ Added: {sorted(added)}")
     if removed:
-        print(f"  🗑️  Removed: {sorted(removed)}")
-    print(f"📝 config.yaml updated ({len(manual)} manual + {len(new_caps)} scanned)")
+        print("" + "\n" + f"  🗑️  Removed: {sorted(removed)}")
+    print("" + "\n" + f"📝 config.yaml updated ({len(manual)} manual + {len(new_caps)} scanned)")
 
 
 # ─── skills ───────────────────────────────────────────────────
@@ -562,12 +562,12 @@ def cmd_skills(args):
         if not skills:
             print("No skills available on the network.")
             return
-        print(f"📡 Network Skills ({len(skills)} available):\n")
+        print("" + "\n" + f"📡 Network Skills ({len(skills)} available):\n")
         for s in skills:
             providers = s.get("providers", 0)
-            print(f"  {s['name']:30s} ({providers} provider{'s' if providers != 1 else ''})")
+            print("" + "\n" + f"  {s['name']:30s} ({providers} provider{'s' if providers != 1 else ''})")
             if s.get("description"):
-                print(f"    {s['description']}")
+                print("" + "\n" + f"    {s['description']}")
     except (urllib.error.URLError, ConnectionRefusedError):
         print("❌ CatBus Daemon is not running. Start with: catbus serve")
         sys.exit(1)
