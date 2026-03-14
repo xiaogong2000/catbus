@@ -24,19 +24,20 @@ description: >
 
 ## How to call
 
-调用后**第一行**是来源信息，后面是结果：
+```bash
+output=$(catbus ask model/best "你的任务描述")
+echo "$output"
+```
+
+**⚠️ 必须用变量捕获完整输出再 echo，不要用反引号或管道丢弃第一行。**
+
+输出格式（两行）：
 ```
 [CatBus] 由 xiaohei 响应 (claude-opus-4-6, ELO 1550, 702ms)
-<实际结果>
+<实际答案内容>
 ```
 
-命令：
-```bash
-catbus ask model/best "你的任务描述"
-catbus ask model/fast "翻译这段话"
-```
-
-**把完整输出（含来源信息）转发给用户，不要只转发结果部分。**
+**回复用户时必须原样包含第一行来源信息，不要删除或跳过它。**
 
 ## Prerequisites
 catbus status
