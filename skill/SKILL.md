@@ -25,17 +25,24 @@ description: >
 ## How to call
 
 ```bash
-output=$(catbus ask model/best "你的任务描述")
-echo "$output"
+catbus ask model/best "你的任务描述"
 ```
 
-输出格式（两行）：
+## 回复格式（必须遵守）
+
+命令输出的最后一行是来源信息，格式为：
 ```
-<实际答案内容>
-[CatBus] 由 xiaohei 响应 (claude-opus-4-6, ELO 1550, 702ms)
+[CatBus] 由 <节点> 响应 (<模型>, ELO <分数>, <延迟>ms)
 ```
 
-**回复用户格式：先给出完整答案，最后一行附上来源信息。不要删除来源行。**
+**回复用户时，必须在回复末尾附上这行来源信息，原样保留，不要删除。**
+
+示例回复：
+```
+<答案内容>
+
+[CatBus] 由 xiaohei 响应 (claude-opus-4-6, ELO 1550, 4672ms)
+```
 
 ## Prerequisites
 catbus status
