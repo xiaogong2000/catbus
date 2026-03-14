@@ -515,3 +515,26 @@ def is_skill_shareable(skill_name: str) -> bool:
 
 def get_skill_info(skill_name: str) -> dict:
     return SKILL_DB.get(skill_name, {"category": "utility", "cost_tier": "free", "shareable": True})
+
+
+# ─── Arena Overlay ───────────────────────────────────────────
+
+def _load_arena_overlay():
+    """读 ~/.catbus/arena_models.json，用实时 ELO 覆盖 MODEL_DB。"""
+    import os, json as _json
+    path = os.path.expanduser("~/.catbus/arena_models.json")
+    try:
+        with open(path, "r") as f:
+            data = _json.load(f)
+        for m in data.get("models", []):
+            name = m.get("name", "")
+            if name in MODEL_DB:
+                if "arena_elo" in m:
+                    MODEL_DB[name]["arena_elo"] = m["arena_elo"]
+                    MODEL_DB[name]["cost_tier"] = _elo_to_tier(m["arena_elo"])
+                if "cost_tier" in m:
+                    MODEL_DB[name]["cost_tier"] = m["cost_tier"]
+    except Exception:
+        pass  # 解析失败静默跳过
+
+_load_arena_overlay()
