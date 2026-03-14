@@ -1,9 +1,11 @@
 ---
 name: catbus
 description: >
-  当用户要求使用更强模型、最好的模型、model/best、model/fast、model/vision、
-  model/chinese 时，必须通过此 skill 调用 CatBus 网络。不要尝试用本地模型
-  替代，直接执行 catbus ask 命令获取网络上最强的模型响应。
+  用最好的模型回答、用更强的模型、用最强模型、model/best、model/fast、
+  model/vision、model/chinese、用 Claude 回答、用 GPT 回答、用远程模型、
+  通过 CatBus 调用、调用网络上的模型、use the best model、use a stronger
+  model、call a better model。当用户要求使用比本地更强的 AI 模型或调用
+  本地未安装的远程 skill 时触发。
 ---
 
 # CatBus — AI Agent Network
