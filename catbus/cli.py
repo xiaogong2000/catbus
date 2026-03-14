@@ -7,6 +7,7 @@ Commands:
   catbus status            — 查看 daemon 状态
   catbus detect            — 手动探测本机模型
   catbus call <capability> — 调用远程能力
+  catbus ask <selector> <task> — 用自然语言调用能力
   catbus bind <token>      — 绑定到 catbus.xyz
   catbus bind-prompt       — 生成 Agent 绑定 prompt
   catbus scan              — 扫描本地 skills
@@ -291,6 +292,57 @@ def cmd_call(args):
         sys.exit(1)
 
 
+# ─── ask ──────────────────────────────────────────────────────
+
+def cmd_ask(args):
+    """Call a capability using natural language task description."""
+    from .config import DEFAULT_PORT
+    port = args.port or DEFAULT_PORT
+    url = f"http://localhost:{port}/request"
+    task = " ".join(args.task) if args.task else ""
+    payload = json.dumps({
+        "capability": args.selector,
+        "skill": args.selector,
+        "input": {"task": task, "prompt": task},
+        "timeout": args.timeout,
+    }).encode()
+    try:
+        req = urllib.request.Request(
+            url, data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=args.timeout + 5) as resp:
+            data = json.loads(resp.read())
+    except (urllib.error.URLError, ConnectionRefusedError):
+        print("[CatBus Error] daemon not running. Run: catbus serve --daemon", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"[CatBus Error] {e}", file=sys.stderr)
+        sys.exit(1)
+    if data.get("status") == "ok":
+        output = data.get("output", {})
+
+        # Display provider source info on stderr (unless --quiet)
+        if not args.quiet:
+            meta = (output if isinstance(output, dict) else {}).get("_catbus_meta") or data.get("_catbus_meta")
+            if meta:
+                node = meta.get("provider_node") or "unknown"
+                model = meta.get("model_used") or "unknown"
+                elo = meta.get("arena_elo") or "?"
+                latency = meta.get("latency_ms") or "?"
+                print(f"[CatBus] 由 {node} 响应 ({model}, ELO {elo}, {latency}ms)", file=sys.stderr)
+
+        if isinstance(output, dict):
+            result = output.get("summary") or output.get("output") or output.get("text") or str(output)
+        else:
+            result = str(output)
+        print(result)
+    else:
+        print(f"[CatBus Error] {data.get('error') or data.get('message') or str(data)}", file=sys.stderr)
+        sys.exit(1)
+
+
 # ─── bind ─────────────────────────────────────────────────────
 
 def cmd_bind(args):
@@ -549,6 +601,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_call.add_argument("--timeout", "-t", type=int, default=30)
     p_call.add_argument("--port", type=int, default=None)
 
+    p_ask = sub.add_parser("ask", help="Call a capability with natural language")
+    p_ask.add_argument("selector", help="Virtual selector (e.g. model/best)")
+    p_ask.add_argument("task", nargs="*", help="Task description")
+    p_ask.add_argument("--timeout", "-t", type=int, default=120)
+    p_ask.add_argument("--port", type=int, default=None)
+    p_ask.add_argument("--quiet", "-q", action="store_true", help="Suppress source info on stderr")
+
     p_bind = sub.add_parser("bind", help="Bind to catbus.xyz")
     p_bind.add_argument("token")
     p_bind.add_argument("--auto", "-a", action="store_true")
@@ -577,6 +636,7 @@ def run():
         "status": cmd_status,
         "detect": cmd_detect,
         "call": cmd_call,
+        "ask": cmd_ask,
         "bind": cmd_bind,
         "bind-prompt": cmd_bind_prompt,
         "skills": cmd_skills,
