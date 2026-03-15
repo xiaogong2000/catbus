@@ -46,6 +46,12 @@ Access models and skills beyond your local setup through the CatBus distributed 
 - 用户要求"中文"、"用中文写"、"中文润色"、"翻译成中文" → `catbus ask model/chinese`
 - 不确定时 → 默认 `catbus ask model/best`
 
+## 强制执行规则（不可违反）
+
+1. **不能自行判断网络上有没有节点** — 必须执行 `catbus ask` 命令，让命令自己报错
+2. **不能用本地能力替代** — 用户要求走 CatBus 就必须走 CatBus，不能说"我帮你搜"
+3. **命令成功就原样转发，失败就转发错误信息** — 不要润色，不要省略
+
 ## How to call
 
 ### 调用远程模型
