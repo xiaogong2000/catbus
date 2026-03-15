@@ -317,20 +317,9 @@ def cmd_ask(args):
     port = args.port or DEFAULT_PORT
     url = f"http://localhost:{port}/request"
     task = " ".join(args.task) if args.task else ""
-    # Normalize selector: bare name like 'weather' -> 'skill/weather', 'gpt-4' -> 'model/gpt-4'
-    selector = args.selector
-    if "/" not in selector:
-        # Guess type: known virtual selectors and model names stay as-is with model/ prefix
-        _VIRTUAL = {"best","fast","vision","chinese","code","math","reasoning","long","cheapest"}
-        if selector in _VIRTUAL:
-            selector = f"model/{selector}"
-        elif any(x in selector for x in ["gpt","claude","gemini","llama","mistral","qwen"]):
-            selector = f"model/{selector}"
-        else:
-            selector = f"skill/{selector}"
     payload = json.dumps({
-        "capability": selector,
-        "skill": selector,
+        "capability": args.selector,
+        "skill": args.selector,
         "input": {"task": task, "prompt": task},
         "timeout": args.timeout,
     }).encode()
