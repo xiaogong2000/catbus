@@ -314,6 +314,7 @@ class CatBusDaemon:
         async for raw in self.ws:
             try:
                 msg = json.loads(raw)
+                log.debug(f"📥 Received {len(raw)} bytes")
             except json.JSONDecodeError:
                 continue
 
