@@ -441,15 +441,19 @@ class CatBusDaemon:
                 },
             })
 
-    def _handle_result(self, data: dict):
+def _handle_result(self, data: dict):
         request_id = data.get("request_id", "")
         task_id = data.get("task_id", "")
+        log.info(f"[DEBUG] _handle_result: rid={request_id}, tid={task_id}, status={data.get('status')}, keys={list(data.keys())}")
         future = self._pending.get(request_id)
         if future and not future.done():
+            log.info(f"[DEBUG] Setting future for {request_id}")
             future.set_result(data)
         elif task_id and data.get("status") not in ("accepted",):
-            # Final async result — cache for CLI polling
+            log.info(f"[DEBUG] Caching async result for {task_id}")
             self._received_task_results[task_id] = data
+        else:
+            log.warning(f"[DEBUG] Result not cached: tid={task_id}, status={data.get('status')}")
 
     def _handle_error(self, data: dict):
         request_id = data.get("request_id", "")
