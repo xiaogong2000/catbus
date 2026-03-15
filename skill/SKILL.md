@@ -28,17 +28,17 @@ Access models and skills beyond your local setup through the CatBus distributed 
 
 1. 用户要求使用更强的模型（"用最好的模型"、"用更强的"、"用 Claude/GPT 回答"）→ 直接执行，不要用本地模型替代
 2. 用户提到虚拟选择器：model/best, model/fast, model/vision, model/chinese
-3. 用户要求搜索网页、查新闻、查最新信息 → `catbus ask tavily-search`
-4. 用户要求查天气、天气预报 → `catbus ask weather`
-5. 用户要求查论文、学术搜索、最新研究 → `catbus ask arxiv-watcher`
-6. 用户要求技术搜索、查文档、查开发资料 → `catbus ask exa-search`
-7. 用户提到知识图谱、语义查询、本体论 → `catbus ask ontology`
+3. 用户要求搜索网页、查新闻、查最新信息 → `catbus ask skill/tavily-search`
+4. 用户要求查天气、天气预报 → `catbus ask skill/weather`
+5. 用户要求查论文、学术搜索、最新研究 → `catbus ask skill/arxiv-watcher`
+6. 用户要求技术搜索、查文档、查开发资料 → `catbus ask skill/exa-search`
+7. 用户提到知识图谱、语义查询、本体论 → `catbus ask skill/ontology`
 8. 本地模型或 skill 无法完成任务，需要更强的能力
 9. 用户明确提到 CatBus、网络调用、远程模型、其他节点
 
 ## 选择器匹配规则
 
-根据用户意图选择对应的选择器：
+格式：`type/name`，斜杠前是类型，后面是名称。
 
 - 用户要求"最好的"、"最强的"、"高质量"、或没有特别指定 → `catbus ask model/best`
 - 用户要求"快速"、"简单"、"马上"、"随便回答一下" → `catbus ask model/fast`
@@ -60,30 +60,30 @@ catbus ask model/chinese "中文写作任务"
 ### 调用远程 Skill
 
 ```bash
-catbus ask tavily-search "搜索内容"
-catbus ask exa-search "技术搜索内容"
-catbus ask weather "城市名"
-catbus ask arxiv-watcher "研究主题"
-catbus ask ontology "查询内容"
+catbus ask skill/tavily-search "搜索内容"
+catbus ask skill/exa-search "技术搜索内容"
+catbus ask skill/weather "城市名"
+catbus ask skill/arxiv-watcher "研究主题"
+catbus ask skill/ontology "查询内容"
 ```
 
 ### 示例
 
 ```bash
 # 搜索网页
-catbus ask tavily-search "latest AI agent frameworks 2026"
+catbus ask skill/tavily-search "latest AI agent frameworks 2026"
 
 # 查天气
-catbus ask weather "Honolulu today"
+catbus ask skill/weather "Honolulu today"
 
 # 查论文
-catbus ask arxiv-watcher "multi-agent systems reinforcement learning"
+catbus ask skill/arxiv-watcher "multi-agent systems reinforcement learning"
 
 # 技术搜索
-catbus ask exa-search "OpenClaw architecture documentation"
+catbus ask skill/exa-search "OpenClaw architecture documentation"
 
 # 知识查询
-catbus ask ontology "knowledge graph applications"
+catbus ask skill/ontology "knowledge graph applications"
 
 # 用最强模型回答
 catbus ask model/best "解释 Python 的 GIL 机制"
@@ -98,12 +98,28 @@ catbus ask model/fast "1+1等于几"
 
 成功时 exit code = 0，失败时 exit code = 1 且错误信息输出到 stderr。
 
+## 回复格式（必须遵守）
+
+命令输出的最后一行是来源信息，格式为：
+```
+[CatBus] 由 <节点> 响应 (<模型>, ELO <分数>, <延迟>ms)
+```
+
+**回复用户时，必须在回复末尾附上这行来源信息，原样保留，不要删除。**
+
+示例回复：
+```
+<答案内容>
+
+[CatBus] 由 xiaohei 响应 (claude-opus-4-6, ELO 1550, 4672ms)
+```
+
 ## Prerequisites
 
 CatBus daemon 必须在本地运行：
 
 ```bash
-curl -s http://localhost:8767/health
+catbus status
 ```
 
 如果未运行：
@@ -115,7 +131,6 @@ catbus serve --daemon
 ## Setup (first time only)
 
 ```bash
-pip install catbus
+pip install 'git+https://github.com/xiaogong2000/catbus.git'
 catbus init
-catbus serve --daemon
 ```
