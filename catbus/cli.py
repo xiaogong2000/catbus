@@ -164,8 +164,7 @@ def cmd_init(args):
     # Auto-install daemon service
     import platform as _platform
     if _platform.system() in ("Linux", "Darwin"):
-        print("" + "
-" + "
+        print("
 ⚙️  Setting up daemon service...")
         try:
             from .service import install_daemon, cleanup_old_daemon
@@ -173,8 +172,7 @@ def cmd_init(args):
             install_daemon()
         except Exception as _e:
             print(f"⚠️  Daemon setup skipped: {_e}")
-            print("" + "
-" + "   Start manually: catbus serve")
+            print("   Start manually: catbus serve")
 
 
 # ─── serve ────────────────────────────────────────────────────
