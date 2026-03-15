@@ -134,8 +134,7 @@ def cleanup_old_daemon():
     import time
     result = subprocess.run(["pgrep", "-f", "catbus serve"], capture_output=True, text=True)
     if result.stdout.strip():
-        pids = result.stdout.strip().split("
-")
+        pids = result.stdout.strip().splitlines()
         for pid in pids:
             try:
                 subprocess.run(["kill", pid.strip()], check=False)
