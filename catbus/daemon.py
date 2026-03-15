@@ -441,7 +441,7 @@ class CatBusDaemon:
                 },
             })
 
-def _handle_result(self, data: dict):
+    def _handle_result(self, data: dict):
         request_id = data.get("request_id", "")
         task_id = data.get("task_id", "")
         log.info(f"[DEBUG] _handle_result: rid={request_id}, tid={task_id}, status={data.get('status')}, keys={list(data.keys())}")
