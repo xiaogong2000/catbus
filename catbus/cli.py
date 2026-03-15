@@ -311,17 +311,77 @@ def cmd_call(args):
 
 # ─── ask ──────────────────────────────────────────────────────
 
+def _poll_task_result(port, task_id, total_timeout=300):
+    """Poll daemon /task/status until task completes or times out."""
+    import time as _time
+    url = f"http://localhost:{port}/task/status"
+    payload = json.dumps({"task_id": task_id}).encode()
+
+    interval = 2.0
+    max_interval = 10.0
+    deadline = _time.time() + total_timeout
+
+    while _time.time() < deadline:
+        _time.sleep(interval)
+        try:
+            req = urllib.request.Request(
+                url, data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data = json.loads(resp.read())
+
+            status = data.get("status", "")
+            if status in ("ok", "done", "failed", "error", "not_found"):
+                return data
+            # Still running — continue polling
+
+        except Exception:
+            pass  # Retry on connection errors
+
+        interval = min(interval * 1.5, max_interval)
+
+    print(f"[CatBus] ⏰ Task {task_id} still running after {total_timeout}s", file=sys.stderr)
+    print(f"[CatBus] Check later: catbus task {task_id}", file=sys.stderr)
+    sys.exit(2)
+
+
+def _print_ask_output(data, quiet=False):
+    """Print output from an ask result (shared by cmd_ask and cmd_task)."""
+    output = data.get("output", {})
+
+    if isinstance(output, dict):
+        result = output.get("summary") or output.get("output") or output.get("text") or str(output)
+    else:
+        result = str(output)
+    print(result)
+
+    if not quiet:
+        meta = (output if isinstance(output, dict) else {}).get("_catbus_meta") or data.get("_catbus_meta")
+        if meta:
+            node = meta.get("provider_node") or "unknown"
+            model = meta.get("model_used") or "unknown"
+            elo = meta.get("arena_elo") or "?"
+            latency = meta.get("latency_ms") or "?"
+            print("\n---")
+            print(f"[by {node}] {model} | ELO {elo} | {latency}ms")
+
+
 def cmd_ask(args):
     """Call a capability using natural language task description."""
     from .config import DEFAULT_PORT
     port = args.port or DEFAULT_PORT
     url = f"http://localhost:{port}/request"
     task = " ".join(args.task) if args.task else ""
+
+    # Submission timeout: 30s (just to get accepted/sync result)
+    submit_timeout = 30
     payload = json.dumps({
         "capability": args.selector,
         "skill": args.selector,
         "input": {"task": task, "prompt": task},
-        "timeout": args.timeout,
+        "timeout": submit_timeout,
     }).encode()
     try:
         req = urllib.request.Request(
@@ -329,35 +389,69 @@ def cmd_ask(args):
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=args.timeout + 5) as resp:
+        with urllib.request.urlopen(req, timeout=submit_timeout + 5) as resp:
             data = json.loads(resp.read())
     except (urllib.error.URLError, ConnectionRefusedError):
         print("[CatBus Error] daemon not running. Run: catbus serve --daemon", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
+        print(f"[CatBus Error] {e}", file=sys.stderr)
+        sys.exit(1)
+
+    # Async accepted → poll for result
+    if data.get("status") == "accepted":
+        task_id = data.get("task_id", "")
+        if task_id:
+            if not args.quiet:
+                print(f"[CatBus] ⏳ Task accepted ({task_id}), waiting for result...", file=sys.stderr)
+            data = _poll_task_result(port, task_id, total_timeout=args.timeout)
+
+    # Old sync format (no task_id) — compatible
+    if data.get("status") == "ok":
+        _print_ask_output(data, quiet=args.quiet)
+    elif data.get("status") in ("failed", "error"):
         print(f"[CatBus Error] {data.get('error') or data.get('message') or str(data)}", file=sys.stderr)
         sys.exit(1)
-    if data.get("status") == "ok":
-        output = data.get("output", {})
-
-        if isinstance(output, dict):
-            result = output.get("summary") or output.get("output") or output.get("text") or str(output)
-        else:
-            result = str(output)
-        print(result)
-
-        # Display provider source info on stdout (after result), unless --quiet
-        if not args.quiet:
-            meta = (output if isinstance(output, dict) else {}).get("_catbus_meta") or data.get("_catbus_meta")
-            if meta:
-                node = meta.get("provider_node") or "unknown"
-                model = meta.get("model_used") or "unknown"
-                elo = meta.get("arena_elo") or "?"
-                latency = meta.get("latency_ms") or "?"
-                print("\n---")
-                print(f"[by {node}] {model} | ELO {elo} | {latency}ms")
     else:
         print(f"[CatBus Error] {data.get('error') or data.get('message') or str(data)}", file=sys.stderr)
+        sys.exit(1)
+
+
+# ─── task ─────────────────────────────────────────────────────
+
+def cmd_task(args):
+    """Query async task status/result."""
+    from .config import DEFAULT_PORT
+    port = args.port or DEFAULT_PORT
+    url = f"http://localhost:{port}/task/status"
+    payload = json.dumps({"task_id": args.task_id}).encode()
+
+    try:
+        req = urllib.request.Request(
+            url, data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read())
+    except (urllib.error.URLError, ConnectionRefusedError):
+        print("❌ CatBus Daemon is not running. Start with: catbus serve", file=sys.stderr)
+        sys.exit(1)
+
+    status = data.get("status", "unknown")
+    if status in ("ok", "done"):
+        _print_ask_output(data, quiet=False)
+    elif status == "running":
+        print(f"⏳ Task {args.task_id} is still running", file=sys.stderr)
+        sys.exit(2)
+    elif status in ("failed", "error"):
+        print(f"❌ Task failed: {data.get('error', 'Unknown error')}", file=sys.stderr)
+        sys.exit(1)
+    elif status == "not_found":
+        print(f"❓ Task {args.task_id} not found", file=sys.stderr)
+        sys.exit(1)
+    else:
+        print(f"❓ Task {args.task_id}: {status}", file=sys.stderr)
         sys.exit(1)
 
 
@@ -623,9 +717,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_ask = sub.add_parser("ask", help="Call a capability with natural language")
     p_ask.add_argument("selector", help="Virtual selector (e.g. model/best)")
     p_ask.add_argument("task", nargs="*", help="Task description")
-    p_ask.add_argument("--timeout", "-t", type=int, default=120)
+    p_ask.add_argument("--timeout", "-t", type=int, default=300, help="Total timeout for async polling (default 300s)")
     p_ask.add_argument("--port", type=int, default=None)
     p_ask.add_argument("--quiet", "-q", action="store_true", help="Suppress source info on stderr")
+
+    p_task = sub.add_parser("task", help="Check async task status/result")
+    p_task.add_argument("task_id", help="Task ID to check")
+    p_task.add_argument("--port", type=int, default=None)
 
     p_bind = sub.add_parser("bind", help="Bind to catbus.xyz")
     p_bind.add_argument("token")
@@ -656,6 +754,7 @@ def run():
         "detect": cmd_detect,
         "call": cmd_call,
         "ask": cmd_ask,
+        "task": cmd_task,
         "bind": cmd_bind,
         "bind-prompt": cmd_bind_prompt,
         "skills": cmd_skills,
