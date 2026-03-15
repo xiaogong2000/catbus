@@ -46,6 +46,11 @@ class CatBusDaemon:
         # Pending outbound requests
         self._pending: dict[str, asyncio.Future] = {}
 
+        # Async task store (provider-side: tasks we're executing)
+        self._async_tasks: dict[str, dict] = {}
+        # Received async results (caller-side: results from relay)
+        self._received_task_results: dict[str, dict] = {}
+
         # 探测到的模型（动态更新）
         self._detected_models: list[CapabilityConfig] = []
         self._last_model_detect: float = 0
@@ -330,6 +335,21 @@ class CatBusDaemon:
                 self._handle_error(data)
             elif msg_type == "skills_list":
                 self._handle_skills_list(data)
+            elif msg_type == "task_status_result":
+                task_id = data.get("task_id", "")
+                query_key = f"_task_status_{task_id}"
+                future = self._pending.get(query_key)
+                if future and not future.done():
+                    future.set_result(data)
+            elif msg_type == "task_status_query":
+                # Relay asking us (as provider) for task status
+                task_id = data.get("task_id", "")
+                task_info = self._async_tasks.get(task_id, {"status": "not_found", "task_id": task_id})
+                await self._ws_send({
+                    "type": "task_status_result",
+                    "node_id": self.node_id,
+                    "data": task_info,
+                })
 
     async def _handle_task(self, data: dict):
         request_id = data.get("request_id", "")
@@ -337,35 +357,99 @@ class CatBusDaemon:
         input_data = data.get("input", {})
 
         log.info(f"📥 Task received: {capability_name} (req: {request_id})")
-        result = await self.executor.execute(capability_name, input_data)
-        log.info(f"📤 Task done: {capability_name} — {result.status} ({result.duration_ms}ms)")
 
-        # model/ 任务 Gateway 报错 → 轻探测确认模型是否还在
-        if result.status == "error" and capability_name.startswith("model/"):
-            error_msg = result.error.lower()
-            if any(kw in error_msg for kw in ["gateway", "502", "503", "timeout", "connection"]):
-                log.warning(f"⚠️  Model task failed, triggering re-detect...")
-                changed = await self._detect_models_light()
-                if changed:
-                    await self._send_register()
+        task_id = request_id
+        self._async_tasks[task_id] = {
+            "status": "running",
+            "task_id": task_id,
+            "capability": capability_name,
+            "created_at": time.time(),
+        }
 
+        # Immediately acknowledge
         await self._ws_send({
             "type": "result",
             "node_id": self.node_id,
             "data": {
                 "request_id": request_id,
-                "status": result.status,
-                "output": result.output,
-                "duration_ms": result.duration_ms,
-                "error": result.error,
+                "status": "accepted",
+                "task_id": task_id,
             },
         })
+        log.info(f"📤 Task accepted: {capability_name} (task: {task_id})")
+
+        # Execute in background
+        asyncio.create_task(self._execute_task_bg(task_id, request_id, capability_name, input_data))
+
+    async def _execute_task_bg(self, task_id: str, request_id: str,
+                                capability_name: str, input_data: dict):
+        created_at = self._async_tasks.get(task_id, {}).get("created_at", time.time())
+        try:
+            result = await self.executor.execute(capability_name, input_data)
+            log.info(f"📤 Task done: {capability_name} — {result.status} ({result.duration_ms}ms)")
+
+            self._async_tasks[task_id] = {
+                "status": result.status,
+                "task_id": task_id,
+                "output": result.output,
+                "error": result.error,
+                "duration_ms": result.duration_ms,
+                "created_at": created_at,
+                "completed_at": time.time(),
+            }
+
+            # Send final result via WS
+            await self._ws_send({
+                "type": "result",
+                "node_id": self.node_id,
+                "data": {
+                    "request_id": request_id,
+                    "task_id": task_id,
+                    "status": result.status,
+                    "output": result.output,
+                    "duration_ms": result.duration_ms,
+                    "error": result.error,
+                },
+            })
+
+            # model/ 任务 Gateway 报错 → 轻探测确认模型是否还在
+            if result.status == "error" and capability_name.startswith("model/"):
+                error_msg = result.error.lower()
+                if any(kw in error_msg for kw in ["gateway", "502", "503", "timeout", "connection"]):
+                    log.warning(f"⚠️  Model task failed, triggering re-detect...")
+                    changed = await self._detect_models_light()
+                    if changed:
+                        await self._send_register()
+
+        except Exception as e:
+            log.error(f"❌ Task execution failed: {e}")
+            self._async_tasks[task_id] = {
+                "status": "failed",
+                "task_id": task_id,
+                "error": str(e),
+                "created_at": created_at,
+                "completed_at": time.time(),
+            }
+            await self._ws_send({
+                "type": "result",
+                "node_id": self.node_id,
+                "data": {
+                    "request_id": request_id,
+                    "task_id": task_id,
+                    "status": "failed",
+                    "error": str(e),
+                },
+            })
 
     def _handle_result(self, data: dict):
         request_id = data.get("request_id", "")
+        task_id = data.get("task_id", "")
         future = self._pending.get(request_id)
         if future and not future.done():
             future.set_result(data)
+        elif task_id and data.get("status") not in ("accepted",):
+            # Final async result — cache for CLI polling
+            self._received_task_results[task_id] = data
 
     def _handle_error(self, data: dict):
         request_id = data.get("request_id", "")
@@ -439,6 +523,53 @@ class CatBusDaemon:
         finally:
             self._pending.pop("_query_skills", None)
 
+    # ─── Async Task Helpers ───────────────────────────────────
+
+    async def query_task_status(self, task_id: str, timeout: int = 10) -> dict:
+        """Query task status: check local caches first, then ask relay via WS."""
+        if task_id in self._received_task_results:
+            return self._received_task_results[task_id]
+        if task_id in self._async_tasks:
+            return self._async_tasks[task_id]
+
+        if not self.connected:
+            return {"status": "unknown", "task_id": task_id, "error": "Not connected"}
+
+        query_key = f"_task_status_{task_id}"
+        loop = asyncio.get_event_loop()
+        future = loop.create_future()
+        self._pending[query_key] = future
+
+        await self._ws_send({
+            "type": "task_status_query",
+            "node_id": self.node_id,
+            "data": {"task_id": task_id},
+        })
+
+        try:
+            result = await asyncio.wait_for(future, timeout=timeout)
+            return result
+        except asyncio.TimeoutError:
+            return {"status": "unknown", "task_id": task_id, "error": "Timeout querying relay"}
+        finally:
+            self._pending.pop(query_key, None)
+
+    async def _cleanup_async_tasks(self):
+        """Every 10 minutes, remove tasks completed over 1 hour ago."""
+        while True:
+            await asyncio.sleep(600)
+            now = time.time()
+            expired = [tid for tid, t in self._async_tasks.items()
+                       if t.get("completed_at") and now - t["completed_at"] > 3600]
+            for tid in expired:
+                del self._async_tasks[tid]
+            expired_recv = [tid for tid, t in self._received_task_results.items()
+                           if t.get("completed_at") and now - t.get("completed_at", now) > 3600]
+            for tid in expired_recv:
+                del self._received_task_results[tid]
+            if expired or expired_recv:
+                log.info(f"🧹 Cleaned {len(expired)} provider tasks, {len(expired_recv)} received results")
+
     # ─── HTTP API ──────────────────────────────────────────────
 
     def create_http_app(self) -> web.Application:
@@ -447,6 +578,7 @@ class CatBusDaemon:
         app.router.add_get("/status", self._http_status)
         app.router.add_get("/network/skills", self._http_network_skills)
         app.router.add_post("/request", self._http_request)
+        app.router.add_post("/task/status", self._http_task_status)
         app.router.add_post("/detect", self._http_detect)
         return app
 
@@ -493,6 +625,20 @@ class CatBusDaemon:
         result = await self.call_remote(capability, input_data, timeout)
         return web.json_response(result)
 
+    async def _http_task_status(self, request: web.Request) -> web.Response:
+        """POST /task/status — query async task status."""
+        try:
+            body = await request.json()
+        except json.JSONDecodeError:
+            return web.json_response({"status": "error", "error": "Invalid JSON"}, status=400)
+
+        task_id = body.get("task_id", "")
+        if not task_id:
+            return web.json_response({"status": "error", "error": "Missing task_id"}, status=400)
+
+        result = await self.query_task_status(task_id)
+        return web.json_response(result)
+
     async def _http_detect(self, request: web.Request) -> web.Response:
         """POST /detect — 手动触发完整探测。"""
         log.info("🔍 Manual detect triggered via HTTP")
@@ -527,5 +673,8 @@ class CatBusDaemon:
         site = web.TCPSite(runner, "127.0.0.1", self.config.port)
         await site.start()
         log.info(f"🌐 HTTP API listening on http://localhost:{self.config.port}")
+
+        # Start async task cleanup loop
+        asyncio.create_task(self._cleanup_async_tasks())
 
         await self.ws_connect()
