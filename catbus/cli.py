@@ -164,8 +164,7 @@ def cmd_init(args):
     # Auto-install daemon service
     import platform as _platform
     if _platform.system() in ("Linux", "Darwin"):
-        print("
-⚙️  Setting up daemon service...")
+        print("\n⚙️  Setting up daemon service...")
         try:
             from .service import install_daemon, cleanup_old_daemon
             cleanup_old_daemon()
