@@ -354,9 +354,8 @@ def cmd_ask(args):
                 model = meta.get("model_used") or "unknown"
                 elo = meta.get("arena_elo") or "?"
                 latency = meta.get("latency_ms") or "?"
-                print(f"
----
-🔗 由 {node} 响应 · {model} · ELO {elo} · {latency}ms")
+                print("\n---")
+                print(f"[by {node}] {model} | ELO {elo} | {latency}ms")
     else:
         print(f"[CatBus Error] {data.get('error') or data.get('message') or str(data)}", file=sys.stderr)
         sys.exit(1)
