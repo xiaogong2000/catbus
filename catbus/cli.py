@@ -190,8 +190,13 @@ def cmd_serve(args):
         sys.exit(1)
 
     if args.daemon:
-        from .service import install_daemon
-        install_daemon()
+        from .service import start_daemon
+        start_daemon()
+        return
+
+    if getattr(args, 'stop', False):
+        from .service import stop_daemon
+        stop_daemon()
         return
 
     config = load_config()
@@ -598,6 +603,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_serve = sub.add_parser("serve", help="Start the CatBus daemon")
     p_serve.add_argument("--daemon", action="store_true")
+    p_serve.add_argument("--stop", action="store_true", help="Stop the running daemon")
 
     p_status = sub.add_parser("status", help="Check daemon status")
     p_status.add_argument("--port", type=int, default=None)

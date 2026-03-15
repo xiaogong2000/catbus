@@ -173,3 +173,53 @@ def uninstall_daemon():
         if plist_file.exists():
             plist_file.unlink()
         print("✅ launchd agent removed")
+
+
+def start_daemon():
+    """Start the catbus daemon via systemd/launchd (install if not present)."""
+    system = platform.system()
+    if system == "Linux":
+        # Check if service exists
+        result = subprocess.run(["systemctl", "is-enabled", "catbus"],
+                                capture_output=True, text=True)
+        if result.returncode != 0:
+            print("⚙️  Service not installed, running install first...")
+            cleanup_old_daemon()
+            install_daemon()
+        else:
+            cleanup_old_daemon()
+            is_root = os.getuid() == 0
+            args = ["systemctl"] if is_root else ["systemctl", "--user"]
+            subprocess.run(args + ["start", "catbus"], check=True)
+            print("✅ CatBus daemon started (systemd)")
+            print("   View status: systemctl status catbus")
+    elif system == "Darwin":
+        plist = Path.home() / "Library" / "LaunchAgents" / "network.catbus.daemon.plist"
+        if not plist.exists():
+            print("⚙️  LaunchAgent not installed, running install first...")
+            cleanup_old_daemon()
+            install_daemon()
+        else:
+            cleanup_old_daemon()
+            subprocess.run(["launchctl", "unload", str(plist)], check=False, capture_output=True)
+            subprocess.run(["launchctl", "load", str(plist)], check=True)
+            print("✅ CatBus daemon started (launchd)")
+    else:
+        print(f"⚠️  Unsupported platform: {system}. Run: catbus serve")
+
+
+def stop_daemon():
+    """Stop the running catbus daemon."""
+    system = platform.system()
+    if system == "Linux":
+        is_root = os.getuid() == 0
+        args = ["systemctl"] if is_root else ["systemctl", "--user"]
+        subprocess.run(args + ["stop", "catbus"], check=False)
+        print("✅ CatBus daemon stopped")
+    elif system == "Darwin":
+        plist = Path.home() / "Library" / "LaunchAgents" / "network.catbus.daemon.plist"
+        subprocess.run(["launchctl", "unload", str(plist)], check=False, capture_output=True)
+        print("✅ CatBus daemon stopped")
+    else:
+        subprocess.run(["pkill", "-f", "catbus serve"], check=False)
+        print("✅ CatBus daemon stopped")
