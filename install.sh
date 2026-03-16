@@ -1,14 +1,14 @@
 #!/bin/bash
 # CatBus Installer
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/xiaogong2000/catbus/main/install.sh | bash
-#   curl -fsSL https://raw.githubusercontent.com/xiaogong2000/catbus/main/install.sh | bash -s -- --bindcode <code>
-#   curl -fsSL https://raw.githubusercontent.com/xiaogong2000/catbus/main/install.sh | bash -s -- --bindcode <code> --relay wss://relay.catbus.xyz
-#   curl -fsSL https://raw.githubusercontent.com/xiaogong2000/catbus/main/install.sh | bash -s -- --uninstall
+#   curl -fsSL https://catbus.xyz/install.sh | bash
+#   curl -fsSL https://catbus.xyz/install.sh | bash -s -- --bindcode <code>
+#   curl -fsSL https://catbus.xyz/install.sh | bash -s -- --bindcode <code> --relay wss://relay.catbus.xyz
+#   curl -fsSL https://catbus.xyz/install.sh | bash -s -- --uninstall
 
 set -eo pipefail
 
-REPO="https://raw.githubusercontent.com/xiaogong2000/catbus/main"
+REPO="https://raw.githubusercontent.com/xiaogong2000/CatBusPub/main"
 
 # ---- 颜色 ----
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
@@ -131,15 +131,15 @@ if command -v catbus &>/dev/null; then
   ok "CatBus already installed: $(catbus --version 2>/dev/null || echo 'unknown')"
 else
   INSTALL_OK=false
-  $PIP install --quiet "git+https://github.com/xiaogong2000/catbus.git" 2>/dev/null && INSTALL_OK=true
+  $PIP install --quiet "git+https://github.com/xiaogong2000/CatBusPub.git" 2>/dev/null && INSTALL_OK=true
   if [ "$INSTALL_OK" = false ]; then
-    $PIP install --quiet --user "git+https://github.com/xiaogong2000/catbus.git" 2>/dev/null && INSTALL_OK=true
+    $PIP install --quiet --user "git+https://github.com/xiaogong2000/CatBusPub.git" 2>/dev/null && INSTALL_OK=true
   fi
   if [ "$INSTALL_OK" = false ]; then
-    $PIP install --quiet --break-system-packages "git+https://github.com/xiaogong2000/catbus.git" 2>/dev/null && INSTALL_OK=true
+    $PIP install --quiet --break-system-packages "git+https://github.com/xiaogong2000/CatBusPub.git" 2>/dev/null && INSTALL_OK=true
   fi
   command -v catbus &>/dev/null || export PATH="$HOME/.local/bin:$PATH"
-  command -v catbus &>/dev/null || fail "Installation failed. Try manually: pip install git+https://github.com/xiaogong2000/catbus.git"
+  command -v catbus &>/dev/null || fail "Installation failed. Try manually: pip install git+https://github.com/xiaogong2000/CatBusPub.git"
   ok "catbus $(catbus --version 2>/dev/null || echo 'installed')"
 fi
 
