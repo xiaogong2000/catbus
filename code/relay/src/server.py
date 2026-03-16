@@ -589,6 +589,12 @@ async def handle_request(ws: WebSocketServerProtocol, node_id: str, data: dict):
 
     log.info(f"📨 Request {request_id}: {node_id[:8]} wants '{skill_name}'")
 
+    # Auto-prefix bare names: "tavily" → "skill/tavily"
+    if "/" not in skill_name:
+        prefixed = f"skill/{skill_name}"
+        log.info(f"[NORMALIZE] '{skill_name}' → '{prefixed}'")
+        skill_name = prefixed
+
     # Find a provider (with virtual selector for model/ capabilities)
     providers = find_providers_with_selector(skill_name, exclude_node=node_id)
     if not providers:
@@ -603,10 +609,9 @@ async def handle_request(ws: WebSocketServerProtocol, node_id: str, data: dict):
         })
         return
 
-    # Pick one (random for now)
+    # Shuffle providers for load balancing — we try them in order on failure
     import random
-    provider = random.choice(providers)
-    log.info(f"🔀 Routing {request_id} → {provider.name} ({provider.node_id[:8]}...)")
+    random.shuffle(providers)
 
     # Store pending request
     pending = PendingRequest(
@@ -617,78 +622,92 @@ async def handle_request(ws: WebSocketServerProtocol, node_id: str, data: dict):
         timeout_seconds=timeout,
     )
     pending_requests[request_id] = pending
-
-    # Track start time for latency
     _request_start_times[request_id] = (time.time(), skill_name)
-
-    # Create a future to wait for result
-    loop = asyncio.get_event_loop()
-    future = loop.create_future()
-    request_futures[request_id] = future
-
-    # Resolve virtual selector to actual capability name
-    actual_skill = skill_name
-    if skill_name in SELECTOR_CONFIGS:
-        # Virtual selector: find provider's best model
-        best_elo, best_cap = -1, None
-        for cap in provider.capabilities:
-            if cap.name.startswith('model/'):
-                elo = cap.meta.get('arena_elo', 0)
-                if elo == 0 and _CAPABILITY_DB_AVAILABLE:
-                    base = extract_base_model(cap.name.replace('model/', ''))
-                    db = get_model_info(base) if base else {}
-                    elo = db.get('arena_elo', 0)
-                if elo > best_elo:
-                    best_elo, best_cap = elo, cap.name
-        if best_cap:
-            actual_skill = best_cap
-            log.info(f"[RESOLVE] {skill_name} → {actual_skill} (ELO {best_elo})")
-
-    # Forward task to provider
-    await send_json(provider.ws, {
-        "type": "task",
-        "data": {
-            "request_id": request_id,
-            "caller_id": node_id,
-            "skill": actual_skill,
-            "input": skill_input,
-        },
-    })
-
-    # Track caller for async callback on late results
     _caller_map[request_id] = node_id
 
-    # Wait for result or timeout
-    try:
-        result = await asyncio.wait_for(future, timeout=timeout)
-        await send_json(ws, result)
-        # Cache the result
-        result_cache[request_id] = {"result": result, "cached_at": time.time()}
-    except asyncio.TimeoutError:
-        log.warning(f"⏰ Timeout on {request_id} — keeping pending for async callback")
-        await send_json(ws, {
-            "type": "error",
+    # Try each provider in order — fallback on gateway errors
+    MAX_RETRIES = min(len(providers), 3)
+    last_result = None
+
+    for attempt, provider in enumerate(providers[:MAX_RETRIES]):
+        log.info(f"🔀 Routing {request_id} → {provider.name} ({provider.node_id[:8]}...) [attempt {attempt+1}/{MAX_RETRIES}]")
+
+        # Resolve virtual selector to actual capability name
+        actual_skill = skill_name
+        if skill_name in SELECTOR_CONFIGS:
+            best_elo, best_cap = -1, None
+            for cap in provider.capabilities:
+                if cap.name.startswith('model/'):
+                    elo = cap.meta.get('arena_elo', 0)
+                    if elo == 0 and _CAPABILITY_DB_AVAILABLE:
+                        base = extract_base_model(cap.name.replace('model/', ''))
+                        db = get_model_info(base) if base else {}
+                        elo = db.get('arena_elo', 0)
+                    if elo > best_elo:
+                        best_elo, best_cap = elo, cap.name
+            if best_cap:
+                actual_skill = best_cap
+                log.info(f"[RESOLVE] {skill_name} → {actual_skill} (ELO {best_elo})")
+
+        # Create a new future for this attempt
+        loop = asyncio.get_event_loop()
+        future = loop.create_future()
+        request_futures[request_id] = future
+
+        # Forward task to provider
+        await send_json(provider.ws, {
+            "type": "task",
             "data": {
                 "request_id": request_id,
-                "code": "timeout",
-                "message": f"Provider did not respond within {timeout}s — result will be pushed when ready",
+                "caller_id": node_id,
+                "skill": actual_skill,
+                "input": skill_input,
             },
         })
-        # Do NOT remove from pending/futures — let late result flow through
-        # The future is already done (TimeoutError), but we keep _caller_map and pending_requests
-        # so handle_result can still push late results via async callback
-    finally:
-        # Always clean up the future (it's resolved or timed out)
-        request_futures.pop(request_id, None)
-        # Keep pending_requests and _caller_map alive for late results (cleaned by cache TTL)
-        # Only clean _request_start_times on success (handle_result does it on late arrival too)
-        if request_id not in result_cache:
-            # Timed out — keep start times for when result eventually arrives
-            pass
-        else:
-            _request_start_times.pop(request_id, None)
-            pending_requests.pop(request_id, None)
-            _caller_map.pop(request_id, None)
+
+        # Wait for result
+        try:
+            result = await asyncio.wait_for(future, timeout=timeout)
+            last_result = result
+
+            # Check if it's a gateway/connection error — retry with next provider
+            result_data = result.get("data", {}) if isinstance(result, dict) else {}
+            error_msg = str(result_data.get("error", "")).lower()
+            is_gateway_error = result_data.get("status") == "error" and any(
+                kw in error_msg for kw in ["gateway", "cannot connect", "connection refused", "502", "503"]
+            )
+
+            if is_gateway_error and attempt < MAX_RETRIES - 1:
+                log.warning(f"⚠️  Provider {provider.name} gateway error: {error_msg[:80]} — trying next provider")
+                continue  # try next provider
+
+            # Success or non-retryable error — send to caller
+            await send_json(ws, result)
+            result_cache[request_id] = {"result": result, "cached_at": time.time()}
+            break
+
+        except asyncio.TimeoutError:
+            if attempt < MAX_RETRIES - 1:
+                log.warning(f"⏰ Provider {provider.name} timed out — trying next provider")
+                continue
+
+            log.warning(f"⏰ Timeout on {request_id} — keeping pending for async callback")
+            await send_json(ws, {
+                "type": "error",
+                "data": {
+                    "request_id": request_id,
+                    "code": "timeout",
+                    "message": f"Provider did not respond within {timeout}s — result will be pushed when ready",
+                },
+            })
+            break
+
+    # Cleanup
+    request_futures.pop(request_id, None)
+    if request_id in result_cache:
+        _request_start_times.pop(request_id, None)
+        pending_requests.pop(request_id, None)
+        _caller_map.pop(request_id, None)
 
 
 async def handle_result(ws: WebSocketServerProtocol, node_id: str, data: dict):
