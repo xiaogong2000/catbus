@@ -128,6 +128,12 @@ export function addUserAgent(userId: number, nodeId: string, name?: string): Use
   return getDb().prepare("SELECT * FROM user_agents WHERE user_id = ? AND node_id = ?").get(userId, nodeId) as UserAgent;
 }
 
+export function renameUserAgent(userId: number, nodeId: string, name: string): number {
+  ensureAgentsTable();
+  const result = getDb().prepare('UPDATE user_agents SET name = ? WHERE user_id = ? AND node_id = ?').run(name, userId, nodeId);
+  return result.changes;
+}
+
 export function removeUserAgent(userId: number, nodeId: string): number {
   ensureAgentsTable();
   const result = getDb().prepare("DELETE FROM user_agents WHERE user_id = ? AND node_id = ?").run(userId, nodeId);

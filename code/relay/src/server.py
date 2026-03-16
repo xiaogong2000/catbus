@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 
 import websockets
 from websockets.server import WebSocketServerProtocol
+from aiohttp import web
 
 logging.basicConfig(
     level=logging.INFO,
@@ -303,6 +304,16 @@ async def reap_stale_nodes(interval: int = 30, timeout: int = 90):
             log.info(f"💀 Reaped stale node: {name} ({nid[:8]}...)")
 
 
+# ─── HTTP API ─────────────────────────────────────────────────
+
+async def api_delete_node(request):
+    node_id = request.match_info['node_id']
+    if node_id not in nodes:
+        return web.json_response({'error': 'NOT_FOUND'}, status=404)
+    del nodes[node_id]
+    return web.json_response({'success': True})
+
+
 # ─── Main ─────────────────────────────────────────────────────
 
 async def main(host: str = "0.0.0.0", port: int = 8765):
@@ -310,6 +321,16 @@ async def main(host: str = "0.0.0.0", port: int = 8765):
 
     # Start reaper
     asyncio.create_task(reap_stale_nodes())
+
+    # HTTP API server
+    app = web.Application()
+    app.router.add_delete('/api/nodes/{node_id}', api_delete_node)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    http_port = port + 1
+    site = web.TCPSite(runner, host, http_port)
+    await site.start()
+    log.info(f"🌐 HTTP API listening on http://{host}:{http_port}")
 
     async with websockets.serve(handle_connection, host, port):
         log.info("🟢 Ready. Waiting for nodes...")
