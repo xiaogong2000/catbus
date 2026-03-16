@@ -587,13 +587,25 @@ async def handle_request(ws: WebSocketServerProtocol, node_id: str, data: dict):
     skill_input = data.get("input", {})
     timeout = data.get("timeout_seconds", 180)
 
-    log.info(f"📨 Request {request_id}: {node_id[:8]} wants '{skill_name}'")
+    log.info(f"📨 Request {request_id}: {node_id[:8]} wants '{skill_name}' (timeout={timeout}s)")
 
     # Auto-prefix bare names: "tavily" → "skill/tavily"
     if "/" not in skill_name:
         prefixed = f"skill/{skill_name}"
         log.info(f"[NORMALIZE] '{skill_name}' → '{prefixed}'")
         skill_name = prefixed
+
+    # Server-side minimum timeout per skill — protects against old clients sending low values
+    SKILL_MIN_TIMEOUTS = {
+        "skill/arxiv-watcher": 300,
+        "skill/seo-competitor-analysis": 300,
+        "skill/agent": 240,
+        "skill/daily-briefing": 240,
+    }
+    min_timeout = SKILL_MIN_TIMEOUTS.get(skill_name, 60)
+    if timeout < min_timeout:
+        log.info(f"[TIMEOUT] Raising {timeout}s → {min_timeout}s for {skill_name}")
+        timeout = min_timeout
 
     # Find a provider (with virtual selector for model/ capabilities)
     providers = find_providers_with_selector(skill_name, exclude_node=node_id)

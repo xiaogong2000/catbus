@@ -261,15 +261,22 @@ def cmd_call(args):
         try:
             input_data = json.loads(args.input)
         except json.JSONDecodeError:
-            print(f"❌ Invalid JSON input: {args.input}")
-            sys.exit(1)
+            # Treat as plain text task
+            input_data = {"task": args.input}
 
-    payload = json.dumps({
+    body = {
         "capability": args.capability,
         "skill": args.capability,
         "input": input_data,
-        "timeout": args.timeout,
-    }).encode()
+    }
+    # Only pass timeout if explicitly set (let daemon use per-skill config)
+    if args.timeout is not None:
+        body["timeout"] = args.timeout
+        http_timeout = args.timeout + 10
+    else:
+        http_timeout = 600  # 10 min max for long-running skills
+
+    payload = json.dumps(body).encode()
 
     try:
         req = urllib.request.Request(
@@ -277,7 +284,7 @@ def cmd_call(args):
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=args.timeout + 5) as resp:
+        with urllib.request.urlopen(req, timeout=http_timeout) as resp:
             data = json.loads(resp.read())
 
         if data.get("status") == "ok":
@@ -289,6 +296,14 @@ def cmd_call(args):
     except (urllib.error.URLError, ConnectionRefusedError):
         print("❌ CatBus Daemon is not running. Start with: catbus serve")
         sys.exit(1)
+
+
+def cmd_ask(args):
+    """Friendly shorthand: catbus ask skill/tavily "search query" """
+    # Convert to call-style args
+    args.input = json.dumps({"task": args.query}) if args.query else "{}"
+    args.port = None
+    cmd_call(args)
 
 
 # ─── bind ─────────────────────────────────────────────────────
@@ -546,7 +561,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_call = sub.add_parser("call", help="Call a remote capability")
     p_call.add_argument("capability")
     p_call.add_argument("--input", "-i", default="{}")
-    p_call.add_argument("--timeout", "-t", type=int, default=30)
+    p_call.add_argument("--timeout", "-t", type=int, default=None)
+
+    # "ask" is a friendly alias: catbus ask skill/tavily "search query"
+    p_ask = sub.add_parser("ask", help="Ask a skill (shorthand for call)")
+    p_ask.add_argument("capability")
+    p_ask.add_argument("query", nargs="?", default="")
+    p_ask.add_argument("--timeout", "-t", type=int, default=None)
     p_call.add_argument("--port", type=int, default=None)
 
     p_bind = sub.add_parser("bind", help="Bind to catbus.xyz")
@@ -577,6 +598,7 @@ def run():
         "status": cmd_status,
         "detect": cmd_detect,
         "call": cmd_call,
+        "ask": cmd_ask,
         "bind": cmd_bind,
         "bind-prompt": cmd_bind_prompt,
         "skills": cmd_skills,
