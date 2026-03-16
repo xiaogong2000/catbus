@@ -160,7 +160,7 @@ class GatewayClient:
             else:
                 content = str(data)
 
-            summary = content[:200] if len(content) > 200 else content
+            summary = content[:4000] if len(content) > 4000 else content
             return {"ok": True, "summary": summary, "output": content}
 
         except asyncio.TimeoutError:

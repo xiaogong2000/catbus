@@ -66,6 +66,20 @@ class Config:
     skills: list[SkillConfig] = field(default_factory=list)
     # limits（可选）
     limits: dict = field(default_factory=dict)
+    # Per-skill timeout overrides (skill_name -> seconds)
+    timeouts: dict = field(default_factory=dict)
+    # Default timeout for all skills (seconds)
+    default_timeout: int = 180
+
+    def get_timeout(self, skill_name: str) -> int:
+        """Get timeout for a skill: per-skill override > default_timeout > 180."""
+        # Try exact match first, then bare name
+        if skill_name in self.timeouts:
+            return self.timeouts[skill_name]
+        bare = skill_name.split("/", 1)[1] if "/" in skill_name else skill_name
+        if bare in self.timeouts:
+            return self.timeouts[bare]
+        return self.default_timeout
 
     def get_capabilities_by_type(self, cap_type: str) -> list[CapabilityConfig]:
         """按类型筛选能力。"""
@@ -182,6 +196,8 @@ def load_config() -> Config:
         config.port = raw.get("port", config.port)
         config.node_name = raw.get("name", "")
         config.limits = raw.get("limits", {})
+        config.default_timeout = raw.get("default_timeout", 180)
+        config.timeouts = raw.get("timeouts", {})
 
         # 新格式：capabilities
         if "capabilities" in raw:

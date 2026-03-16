@@ -46,6 +46,12 @@ class CatBusDaemon:
         # Pending outbound requests
         self._pending: dict[str, asyncio.Future] = {}
 
+        # Late result callbacks: request_id -> callback coroutine
+        self._late_callbacks: dict[str, asyncio.Future] = {}
+
+        # Progress callbacks: request_id -> callback callable
+        self._progress_callbacks: dict[str, callable] = {}
+
         # 探测到的模型（动态更新）
         self._detected_models: list[CapabilityConfig] = []
         self._last_model_detect: float = 0
@@ -326,10 +332,39 @@ class CatBusDaemon:
                 asyncio.create_task(self._handle_task(data))
             elif msg_type == "result":
                 self._handle_result(data)
+            elif msg_type == "late_result":
+                self._handle_late_result(data)
+            elif msg_type == "progress":
+                self._handle_progress(data)
+            elif msg_type == "task_status":
+                self._handle_result(data)  # same handling as result
             elif msg_type == "error":
                 self._handle_error(data)
             elif msg_type == "skills_list":
                 self._handle_skills_list(data)
+
+    async def _send_progress(self, request_id: str, message: str):
+        """Send a progress heartbeat to the relay server."""
+        await self._ws_send({
+            "type": "progress",
+            "node_id": self.node_id,
+            "data": {
+                "request_id": request_id,
+                "message": message,
+                "timestamp": time.time(),
+            },
+        })
+
+    async def _progress_heartbeat_loop(self, request_id: str, capability_name: str):
+        """Send periodic progress heartbeats every 15s while a task is running."""
+        elapsed = 0
+        while True:
+            await asyncio.sleep(15)
+            elapsed += 15
+            await self._send_progress(
+                request_id,
+                f"⏳ {capability_name} still running ({elapsed}s elapsed)",
+            )
 
     async def _handle_task(self, data: dict):
         request_id = data.get("request_id", "")
@@ -337,7 +372,20 @@ class CatBusDaemon:
         input_data = data.get("input", {})
 
         log.info(f"📥 Task received: {capability_name} (req: {request_id})")
-        result = await self.executor.execute(capability_name, input_data)
+
+        # Start progress heartbeat
+        heartbeat = asyncio.create_task(
+            self._progress_heartbeat_loop(request_id, capability_name)
+        )
+        try:
+            result = await self.executor.execute(capability_name, input_data)
+        finally:
+            heartbeat.cancel()
+            try:
+                await heartbeat
+            except asyncio.CancelledError:
+                pass
+
         log.info(f"📤 Task done: {capability_name} — {result.status} ({result.duration_ms}ms)")
 
         # model/ 任务 Gateway 报错 → 轻探测确认模型是否还在
@@ -366,6 +414,25 @@ class CatBusDaemon:
         future = self._pending.get(request_id)
         if future and not future.done():
             future.set_result(data)
+
+    def _handle_late_result(self, data: dict):
+        """Handle late results that arrive after timeout — async callback."""
+        request_id = data.get("request_id", "")
+        log.info(f"📬 Late result received for {request_id}")
+        # Store in a buffer that HTTP API can poll
+        if not hasattr(self, '_late_results'):
+            self._late_results = {}
+        self._late_results[request_id] = data
+        # Also try resolving any pending future (e.g. from retry/poll)
+        future = self._pending.get(request_id)
+        if future and not future.done():
+            future.set_result(data)
+
+    def _handle_progress(self, data: dict):
+        """Handle progress updates from provider — log them."""
+        request_id = data.get("request_id", "")
+        message = data.get("message", "")
+        log.info(f"📊 Progress {request_id}: {message}")
 
     def _handle_error(self, data: dict):
         request_id = data.get("request_id", "")
@@ -396,9 +463,13 @@ class CatBusDaemon:
 
     # ─── Outbound Requests ─────────────────────────────────────
 
-    async def call_remote(self, capability: str, input_data: dict, timeout: int = 30) -> dict:
+    async def call_remote(self, capability: str, input_data: dict, timeout: int = None) -> dict:
         if not self.connected:
             return {"status": "error", "error": "Not connected to CatBus Server"}
+
+        # Per-skill timeout from config, fallback to explicit timeout or default
+        if timeout is None:
+            timeout = self.config.get_timeout(capability)
 
         request_id = f"req_{uuid.uuid4().hex[:8]}"
         loop = asyncio.get_event_loop()
@@ -421,7 +492,11 @@ class CatBusDaemon:
             result = await asyncio.wait_for(future, timeout=timeout)
             return result
         except asyncio.TimeoutError:
-            return {"status": "error", "error": f"Timeout after {timeout}s"}
+            return {
+                "status": "error",
+                "error": f"Timeout after {timeout}s — result may arrive later (request_id: {request_id})",
+                "request_id": request_id,
+            }
         finally:
             self._pending.pop(request_id, None)
 
@@ -447,6 +522,7 @@ class CatBusDaemon:
         app.router.add_get("/status", self._http_status)
         app.router.add_get("/network/skills", self._http_network_skills)
         app.router.add_post("/request", self._http_request)
+        app.router.add_get("/task/{request_id}", self._http_task_status)
         app.router.add_post("/detect", self._http_detect)
         return app
 
@@ -481,7 +557,7 @@ class CatBusDaemon:
 
         capability = body.get("capability", "") or body.get("skill", "")
         input_data = body.get("input", {})
-        timeout = body.get("timeout", 30)
+        timeout = body.get("timeout", None)
 
         if not capability and "task" in body:
             capability = "agent"
@@ -490,8 +566,21 @@ class CatBusDaemon:
             return web.json_response(
                 {"status": "error", "error": "Missing 'capability' or 'skill' field"}, status=400)
 
-        result = await self.call_remote(capability, input_data, timeout)
+        # Use explicit timeout if provided, otherwise per-skill config
+        if timeout is not None:
+            result = await self.call_remote(capability, input_data, int(timeout))
+        else:
+            result = await self.call_remote(capability, input_data)
         return web.json_response(result)
+
+    async def _http_task_status(self, request: web.Request) -> web.Response:
+        """GET /task/{request_id} — poll for late results."""
+        request_id = request.match_info["request_id"]
+        if hasattr(self, '_late_results') and request_id in self._late_results:
+            data = self._late_results.pop(request_id)
+            return web.json_response(data)
+        return web.json_response(
+            {"status": "pending", "request_id": request_id, "message": "No result yet"})
 
     async def _http_detect(self, request: web.Request) -> web.Response:
         """POST /detect — 手动触发完整探测。"""
