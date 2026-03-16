@@ -1,14 +1,17 @@
 #!/bin/bash
-# CatBus Installer
+# CatBus Installer / Upgrader
 # Usage:
-#   curl -fsSL https://catbus.xyz/install.sh | bash
+#   curl -fsSL https://catbus.xyz/install.sh | bash                    # 安装 / 升级
+#   curl -fsSL https://catbus.xyz/install.sh | bash -s -- --upgrade    # 仅升级
 #   curl -fsSL https://catbus.xyz/install.sh | bash -s -- --bindcode <code>
 #   curl -fsSL https://catbus.xyz/install.sh | bash -s -- --bindcode <code> --relay wss://relay.catbus.xyz
+#   curl -fsSL https://catbus.xyz/install.sh | bash -s -- --env dev    # 使用测试环境 relay
 #   curl -fsSL https://catbus.xyz/install.sh | bash -s -- --uninstall
 
 set -eo pipefail
 
 REPO="https://raw.githubusercontent.com/xiaogong2000/CatBusPub/main"
+PKG_URL="https://catbus.xyz/releases/catbus-latest.tar.gz"
 
 # ---- 颜色 ----
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
@@ -21,6 +24,7 @@ fail()  { echo -e "${RED}❌${NC} $*"; exit 1; }
 BIND_CODE=""
 RELAY_URL=""
 UNINSTALL=false
+UPGRADE_ONLY=false
 while [ $# -gt 0 ]; do
   case "$1" in
     --bindcode=*) BIND_CODE="${1#*=}"; shift ;;
@@ -29,6 +33,7 @@ while [ $# -gt 0 ]; do
     --relay)      RELAY_URL="${2:-}"; shift 2 ;;
     --env)        [ "${2:-}" = "dev" ] && RELAY_URL="wss://relay.catbus.xyz" || RELAY_URL="wss://relay.catbus.ai"; shift 2 ;;
     --uninstall)  UNINSTALL=true; shift ;;
+    --upgrade)    UPGRADE_ONLY=true; shift ;;
     *) shift ;;
   esac
 done
@@ -104,22 +109,27 @@ fi
 echo ""
 echo -e "${BOLD}🚌 CatBus Installer${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+[ "$UPGRADE_ONLY" = true ] && echo -e "   Mode  : upgrade only"
 [ -n "$RELAY_URL" ] && echo -e "   Relay : $RELAY_URL" || echo -e "   Relay : wss://relay.catbus.ai (default)"
 [ -n "$BIND_CODE" ] && echo -e "   Bind  : $BIND_CODE"
 echo ""
 
 # ── Step 1: OpenClaw skill ───────────────────────────────────────
-echo -e "${BOLD}📦 Step 1/5 — Installing OpenClaw skill...${NC}"
-SKILL_DIR="${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}/skills/catbus"
 WS="${OPENCLAW_WORKSPACE:-$HOME/.openclaw/workspace}"
-if [ ! -d "$WS" ]; then
-  warn "OpenClaw workspace not found at $WS (install OpenClaw first to use skill features)"
+SKILL_DIR="$WS/skills/catbus"
+if [ "$UPGRADE_ONLY" = false ]; then
+  echo -e "${BOLD}📦 Step 1/5 — Installing OpenClaw skill...${NC}"
+  if [ ! -d "$WS" ]; then
+    warn "OpenClaw workspace not found at $WS (install OpenClaw first to use skill features)"
+  fi
+  mkdir -p "$SKILL_DIR"
+  curl -fsSL "$REPO/skill/SKILL.md" -o "$SKILL_DIR/SKILL.md"
+  ok "Skill installed → $SKILL_DIR/SKILL.md"
+else
+  info "Skipping step 1 (upgrade mode)"
 fi
-mkdir -p "$SKILL_DIR"
-curl -fsSL "$REPO/skill/SKILL.md" -o "$SKILL_DIR/SKILL.md"
-ok "Skill installed → $SKILL_DIR/SKILL.md"
 
-# ── Step 2: pip install (from GitHub, not PyPI) ──────────────────
+# ── Step 2: pip install / upgrade from catbus.xyz ─────────────────
 echo ""
 echo -e "${BOLD}🐍 Step 2/5 — Installing catbus...${NC}"
 if ! command -v pip3 &>/dev/null && ! command -v pip &>/dev/null; then
@@ -127,35 +137,41 @@ if ! command -v pip3 &>/dev/null && ! command -v pip &>/dev/null; then
 fi
 PIP=$(command -v pip3 || command -v pip)
 
+_pip_install() {
+  # Try 3 methods: normal → --user → --break-system-packages
+  $PIP install --quiet "$@" 2>/dev/null && return 0
+  $PIP install --quiet --user "$@" 2>/dev/null && return 0
+  $PIP install --quiet --break-system-packages "$@" 2>/dev/null && return 0
+  return 1
+}
+
 if command -v catbus &>/dev/null; then
-  ok "CatBus already installed: $(catbus --version 2>/dev/null || echo 'unknown')"
+  CURRENT_VER=$(catbus --version 2>/dev/null || echo 'unknown')
+  info "CatBus current version: $CURRENT_VER — upgrading..."
+  _pip_install --upgrade "$PKG_URL" && ok "catbus upgraded: $(catbus --version 2>/dev/null || echo 'latest')" \
+    || warn "Upgrade failed, keeping current version"
 else
-  INSTALL_OK=false
-  $PIP install --quiet "git+https://github.com/xiaogong2000/CatBusPub.git" 2>/dev/null && INSTALL_OK=true
-  if [ "$INSTALL_OK" = false ]; then
-    $PIP install --quiet --user "git+https://github.com/xiaogong2000/CatBusPub.git" 2>/dev/null && INSTALL_OK=true
-  fi
-  if [ "$INSTALL_OK" = false ]; then
-    $PIP install --quiet --break-system-packages "git+https://github.com/xiaogong2000/CatBusPub.git" 2>/dev/null && INSTALL_OK=true
-  fi
+  info "Installing catbus from $PKG_URL ..."
+  _pip_install "$PKG_URL" || fail "Installation failed. Try manually: pip install $PKG_URL"
   command -v catbus &>/dev/null || export PATH="$HOME/.local/bin:$PATH"
-  command -v catbus &>/dev/null || fail "Installation failed. Try manually: pip install git+https://github.com/xiaogong2000/CatBusPub.git"
+  command -v catbus &>/dev/null || fail "catbus command not found after install. Check PATH."
   ok "catbus $(catbus --version 2>/dev/null || echo 'installed')"
 fi
 
 # ── Step 3: Init + relay config ─────────────────────────────────
-echo ""
-echo -e "${BOLD}⚙️  Step 3/5 — Initializing CatBus...${NC}"
-if [ ! -f "$HOME/.catbus/config.yaml" ]; then
-  catbus init
-  ok "Initialized, node_id generated"
-else
-  info "Already initialized, skipping"
-fi
+if [ "$UPGRADE_ONLY" = false ]; then
+  echo ""
+  echo -e "${BOLD}⚙️  Step 3/5 — Initializing CatBus...${NC}"
+  if [ ! -f "$HOME/.catbus/config.yaml" ]; then
+    catbus init
+    ok "Initialized, node_id generated"
+  else
+    info "Already initialized, skipping"
+  fi
 
-# 设置 relay（用 Python 写，同时兼容两个字段名）
-EFFECTIVE_RELAY="${RELAY_URL:-wss://relay.catbus.ai}"
-python3 - <<PYEOF
+  # 设置 relay（用 Python 写，同时兼容两个字段名）
+  EFFECTIVE_RELAY="${RELAY_URL:-wss://relay.catbus.ai}"
+  python3 - <<PYEOF
 import yaml, os
 cfg_path = os.path.expanduser('~/.catbus/config.yaml')
 with open(cfg_path) as f:
@@ -165,20 +181,28 @@ cfg['server_url'] = '$EFFECTIVE_RELAY'
 with open(cfg_path, 'w') as f:
     yaml.dump(cfg, f)
 PYEOF
-ok "Relay set to $EFFECTIVE_RELAY"
+  ok "Relay set to $EFFECTIVE_RELAY"
 
-# ── Step 4: Register OpenClaw skills ────────────────────────────
-echo ""
-echo -e "${BOLD}🔍 Step 4/5 — Registering OpenClaw skills...${NC}"
-if [ -d "$WS" ]; then
-  catbus scan --add 2>/dev/null && ok "Skills registered" || warn "skill scan skipped (OpenClaw not found)"
+  # ── Step 4: Register OpenClaw skills ────────────────────────────
+  echo ""
+  echo -e "${BOLD}🔍 Step 4/5 — Registering OpenClaw skills...${NC}"
+  if [ -d "$WS" ]; then
+    catbus scan --add 2>/dev/null && ok "Skills registered" || warn "skill scan skipped (OpenClaw not found)"
+  else
+    warn "Skipping skill scan (no OpenClaw workspace)"
+  fi
 else
-  warn "Skipping skill scan (no OpenClaw workspace)"
+  info "Skipping steps 3-4 (upgrade mode)"
 fi
 
-# ── Step 5: Start daemon + autostart ────────────────────────────
+# ── Step 5: Start / restart daemon + autostart ───────────────────
 echo ""
 echo -e "${BOLD}🚀 Step 5/5 — Starting daemon...${NC}"
+if [ "$UPGRADE_ONLY" = true ] && curl -s --max-time 2 http://localhost:9800/health &>/dev/null; then
+  info "Restarting daemon to apply upgrade..."
+  pkill -f "catbus serve" 2>/dev/null || true
+  sleep 2
+fi
 if curl -s --max-time 2 http://localhost:9800/health &>/dev/null; then
   ok "Daemon already running"
 else
