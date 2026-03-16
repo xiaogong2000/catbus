@@ -182,8 +182,45 @@ with open(cfg_path, 'w') as f:
     yaml.dump(cfg, f)
 PYEOF
   ok "Relay set to $EFFECTIVE_RELAY"
+fi
 
-  # ── Step 4: Register OpenClaw skills ────────────────────────────
+# ── Step 3.5: Ensure timeout config exists ─────────────────────
+echo ""
+info "Checking timeout config..."
+python3 - <<'PYEOF'
+import yaml, os
+cfg_path = os.path.expanduser('~/.catbus/config.yaml')
+if not os.path.exists(cfg_path):
+    exit(0)
+with open(cfg_path) as f:
+    cfg = yaml.safe_load(f) or {}
+changed = False
+if 'default_timeout' not in cfg:
+    cfg['default_timeout'] = 180
+    changed = True
+if 'timeouts' not in cfg:
+    cfg['timeouts'] = {
+        'arxiv-watcher': 300,
+        'tavily': 120,
+        'agent': 240,
+        'daily-briefing': 240,
+        'seo-competitor-analysis': 300,
+    }
+    changed = True
+if changed:
+    with open(cfg_path, 'w') as f:
+        yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True)
+    print('UPDATED')
+else:
+    print('OK')
+PYEOF
+TIMEOUT_RESULT=$?
+if [ $TIMEOUT_RESULT -eq 0 ]; then
+  ok "Timeout config ready (default: 180s)"
+fi
+
+# ── Step 4: Register OpenClaw skills ────────────────────────────
+if [ "$UPGRADE_ONLY" = false ]; then
   echo ""
   echo -e "${BOLD}🔍 Step 4/5 — Registering OpenClaw skills...${NC}"
   if [ -d "$WS" ]; then
@@ -192,7 +229,7 @@ PYEOF
     warn "Skipping skill scan (no OpenClaw workspace)"
   fi
 else
-  info "Skipping steps 3-4 (upgrade mode)"
+  info "Skipping step 4 (upgrade mode)"
 fi
 
 # ── Step 5: Start / restart daemon + autostart ───────────────────
