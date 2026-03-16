@@ -416,7 +416,11 @@ class CatBusDaemon:
             future.set_result(data)
 
     def _handle_late_result(self, data: dict):
-        """Handle late results that arrive after timeout — async callback."""
+        """Handle late results that arrive after timeout — async callback.
+
+        Since OpenClaw already gave up waiting, we push directly to Telegram
+        if bot token is configured.
+        """
         request_id = data.get("request_id", "")
         log.info(f"📬 Late result received for {request_id}")
         # Store in a buffer that HTTP API can poll
@@ -427,6 +431,89 @@ class CatBusDaemon:
         future = self._pending.get(request_id)
         if future and not future.done():
             future.set_result(data)
+        else:
+            # No one is waiting — push to Telegram directly
+            self._notify_late_result(request_id, data)
+
+    def _notify_late_result(self, request_id: str, data: dict):
+        """Send late result directly to Telegram as a fallback notification."""
+        import threading
+        import urllib.request
+        import urllib.parse
+
+        # Extract content from result
+        output = data.get("output", {})
+        if isinstance(output, dict):
+            content = output.get("output", "") or output.get("summary", "")
+        else:
+            content = str(output)
+        if not content:
+            log.info(f"📬 Late result {request_id}: empty content, skip notify")
+            return
+
+        # Try to load Telegram config from OpenClaw or catbus config
+        bot_token, chat_id = self._load_telegram_config()
+        if not bot_token or not chat_id:
+            log.info(f"📬 Late result {request_id}: no Telegram config, stored in memory only")
+            return
+
+        # Format and send
+        text = f"📬 延迟到达的结果 ({request_id}):\n\n{content}"
+        # Telegram 4096 limit — split if needed
+        TG_MAX = 4096
+        chunks = []
+        while len(text) > TG_MAX:
+            cut = text.rfind("\n", 0, TG_MAX)
+            if cut <= 0:
+                cut = TG_MAX
+            chunks.append(text[:cut])
+            text = text[cut:].lstrip("\n")
+        if text:
+            chunks.append(text)
+
+        def _send():
+            for chunk in chunks:
+                try:
+                    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+                    payload = urllib.parse.urlencode({
+                        "chat_id": chat_id,
+                        "text": chunk,
+                    }).encode()
+                    urllib.request.urlopen(url, payload, timeout=10)
+                except Exception as e:
+                    log.warning(f"📬 Telegram notify failed: {e}")
+
+        threading.Thread(target=_send, daemon=True).start()
+        log.info(f"📬 Late result {request_id}: pushed to Telegram ({len(content)} chars)")
+
+    def _load_telegram_config(self) -> tuple:
+        """Load Telegram bot_token and chat_id from OpenClaw or catbus config."""
+        if hasattr(self, '_tg_cache'):
+            return self._tg_cache
+
+        bot_token = chat_id = ""
+        # Try OpenClaw config first
+        try:
+            import json
+            from pathlib import Path
+            oc_cfg = Path.home() / ".openclaw" / "openclaw.json"
+            if oc_cfg.exists():
+                with open(oc_cfg) as f:
+                    oc = json.load(f)
+                tg = oc.get("channels", {}).get("telegram", {})
+                bot_token = tg.get("botToken", "")
+                chat_id = tg.get("chatId", "") or tg.get("chat_id", "")
+        except Exception:
+            pass
+
+        # Fallback to catbus config
+        if not chat_id:
+            notify_cfg = self.config.limits.get("notify", {})
+            bot_token = bot_token or notify_cfg.get("telegram_bot_token", "")
+            chat_id = notify_cfg.get("telegram_chat_id", "")
+
+        self._tg_cache = (bot_token, chat_id)
+        return self._tg_cache
 
     def _handle_progress(self, data: dict):
         """Handle progress updates from provider — log them."""
