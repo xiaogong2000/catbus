@@ -411,6 +411,10 @@ class CatBusDaemon:
 
     def _handle_result(self, data: dict):
         request_id = data.get("request_id", "")
+        # "accepted" is an intermediate ack — skip it, keep waiting for final result
+        if data.get("status") == "accepted":
+            log.info(f"📋 Task {request_id} accepted by provider, waiting for result...")
+            return
         future = self._pending.get(request_id)
         if future and not future.done():
             future.set_result(data)

@@ -287,10 +287,16 @@ def cmd_call(args):
         with urllib.request.urlopen(req, timeout=http_timeout) as resp:
             data = json.loads(resp.read())
 
-        if data.get("status") == "ok":
-            print(json.dumps(data.get("output", {}), indent=2, ensure_ascii=False))
+        status = data.get("status", "")
+        if status == "ok" or (status not in ("error", "") and "output" in data):
+            output = data.get("output", data.get("result", {}))
+            if isinstance(output, str):
+                print(output)
+            else:
+                print(json.dumps(output, indent=2, ensure_ascii=False))
         else:
-            print(f"❌ {data.get('error', 'Unknown error')}")
+            error_msg = data.get("error") or data.get("message") or json.dumps(data, ensure_ascii=False)
+            print(f"❌ {error_msg}")
             sys.exit(1)
 
     except (urllib.error.URLError, ConnectionRefusedError):

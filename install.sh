@@ -138,17 +138,17 @@ fi
 PIP=$(command -v pip3 || command -v pip)
 
 _pip_install() {
-  # Try 3 methods: normal → --user → --break-system-packages
-  $PIP install --quiet "$@" 2>/dev/null && return 0
-  $PIP install --quiet --user "$@" 2>/dev/null && return 0
-  $PIP install --quiet --break-system-packages "$@" 2>/dev/null && return 0
+  # Try 3 methods: --break-system-packages first (modern Debian/Ubuntu) → normal → --user
+  $PIP install --break-system-packages "$@" 2>&1 && return 0
+  $PIP install "$@" 2>&1 && return 0
+  $PIP install --user "$@" 2>&1 && return 0
   return 1
 }
 
 if command -v catbus &>/dev/null; then
   CURRENT_VER=$(catbus --version 2>/dev/null || echo 'unknown')
   info "CatBus current version: $CURRENT_VER — upgrading..."
-  _pip_install --upgrade "$PKG_URL" && ok "catbus upgraded: $(catbus --version 2>/dev/null || echo 'latest')" \
+  _pip_install --force-reinstall --no-deps "$PKG_URL" && ok "catbus upgraded: $(catbus --version 2>/dev/null || echo 'latest')" \
     || warn "Upgrade failed, keeping current version"
 else
   info "Installing catbus from $PKG_URL ..."
