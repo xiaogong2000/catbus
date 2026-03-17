@@ -1,0 +1,88 @@
+{
+  "version": "1.0.0",
+  "total": 90,
+  "last_updated": "2026-03-15",
+  "categories": {
+    "development": {
+      "label": "Development & Coding",
+      "label_zh": "开发与编码",
+      "skills": [
+        "code-security-audit", "bug-audit", "debug-methodology", "auto-test-generator",
+        "astrai-code-review", "architecture-research", "agentlens", "ftw",
+        "dependency-auditor", "context-builder"
+      ]
+    },
+    "browser": {
+      "label": "Browser & Automation",
+      "label_zh": "浏览器与自动化",
+      "skills": [
+        "super-browser", "agent-browser", "mac-use", "n8n-workflow",
+        "browser-use", "mcp-chrome", "actionbook", "android-adb",
+        "camoufox", "cdp-browser"
+      ]
+    },
+    "research": {
+      "label": "Search & Research",
+      "label_zh": "搜索与研究",
+      "skills": [
+        "super-research", "web-search-pro", "exa-search", "academic-deep-research",
+        "agent-deep-research", "tavily", "autonomous-research", "arxiv-watcher",
+        "content-research", "meyhem-researcher"
+      ]
+    },
+    "devops": {
+      "label": "DevOps & Cloud",
+      "label_zh": "DevOps 与云服务",
+      "skills": [
+        "agentic-devops", "docker-skill", "cloudflare-guard", "grafana-lens",
+        "aws-infra", "neo-tf-module-generator", "neo-docker-to-k8s-manifests",
+        "ansible-skill", "aws-ecs-monitor", "azure-infra"
+      ]
+    },
+    "git": {
+      "label": "Git & GitHub",
+      "label_zh": "Git 与 GitHub",
+      "skills": [
+        "super-github", "conventional-commits", "git-changelog", "git-essentials",
+        "git-workflows", "git-pushing", "arc-skill-gitops", "auto-pr-merger",
+        "repo-pr-triage", "fork-manager"
+      ]
+    },
+    "agent": {
+      "label": "AI & Agent Intelligence",
+      "label_zh": "AI 与智能体能力",
+      "skills": [
+        "capability-evolver", "self-improving-agent", "adaptive-reasoning",
+        "agent-guardrails", "agent-cost-monitor", "agent-orchestrator",
+        "agent-mode-upgrades", "cortex-memory", "agent-sentinel", "agora-council"
+      ]
+    },
+    "productivity": {
+      "label": "Productivity & Workflow",
+      "label_zh": "生产力与工作流",
+      "skills": [
+        "mission-control", "clawflows", "summarize", "agent-autopilot",
+        "meeting-to-action", "cairn-cli", "asana", "adaptlypost",
+        "blogburst", "ai-daily-briefing"
+      ]
+    },
+    "security": {
+      "label": "Security & Safety",
+      "label_zh": "安全与防护",
+      "skills": [
+        "agent-safety", "agents-skill-security-audit", "credential-scanner",
+        "agent-hardening", "ggshield-scanner", "credential-manager",
+        "1password", "bitwarden", "domain-trust-check", "secure-auth-patterns"
+      ]
+    },
+    "data-media": {
+      "label": "Data, Media & Integration",
+      "label_zh": "数据、媒体与集成",
+      "skills": [
+        "gog", "composio", "elevenlabs-agent", "openai-whisper",
+        "faster-whisper", "data-analyst", "csv-pipeline", "duckdb-en",
+        "senior-data-scientist", "supabase"
+      ]
+    }
+  }
+}
