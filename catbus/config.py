@@ -17,6 +17,7 @@ import yaml
 
 CATBUS_HOME = Path(os.environ.get("CATBUS_HOME", Path.home() / ".catbus"))
 DEFAULT_SERVER = os.environ.get("CATBUS_SERVER", "wss://relay.catbus.ai")
+# Default daemon port: 9800 (aligned with catbus-client.service)
 DEFAULT_PORT = int(os.environ.get("CATBUS_PORT", "9800"))
 
 

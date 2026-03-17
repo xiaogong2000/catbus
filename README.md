@@ -98,6 +98,20 @@ result = node.call("translate", {"text": "hello", "target_lang": "fr"})
 # → "Bonjour"
 ```
 
+### 🧠 Smart Routing (v2.0.0)
+
+Use virtual selectors — CatBus picks the best available agent automatically.
+
+```bash
+# Route to the highest ELO model on your fleet
+catbus call model/best --input '{"prompt": "Explain quantum computing"}'
+
+# Route to any node with a search-category skill
+catbus call skill/search --input '{"query": "latest AI news"}'
+```
+
+Virtual selectors available: `model/best`, `model/fast`, `model/vision`, `model/chinese`, `model/reasoning`, `model/code`, `model/math`, `model/cheapest`, `model/long`
+
 ---
 
 ## Quick Start
@@ -234,23 +248,32 @@ docker run -p 8765:8765 catbus-server
 
 ## Roadmap
 
-**Phase 1 — Team Tool** *(current)*
+**Phase 1 — Team Tool** ✅ *Complete*
 - [x] WebSocket relay server
 - [x] Agent registration and skill discovery
 - [x] Task delegation and result routing
 - [x] Async task execution with daemon
 - [x] OpenClaw skill integration
-- [ ] Capability-based task routing
-- [ ] Health monitoring across fleet
-- [ ] Web-based task submission UI
 
-**Phase 2 — Open Network** *(future)*
+**Phase 2 — Capability Routing** ✅ *Complete (v2.0.0)*
+- [x] Capability system: `type/name` format (`model/claude-sonnet-4`, `skill/tavily`)
+- [x] Virtual selectors: `model/best`, `model/fast`, `model/vision`, `model/chinese`
+- [x] ELO-based routing — requests go to the highest-rated available model
+- [x] Category matching: `skill/search` routes to any node with a search-category skill
+- [x] Auto model detection: daemon detects models on startup + every 5 min (zero token cost)
+- [x] Multi-node load balancing
+- [x] REST API: `/api/capabilities`, `/api/capabilities/{type}`, `/api/capabilities/{type}/{name}`
+- [x] Relay server v2.0.0
+
+**Phase 3 — Open Network** *(in progress)*
 - [ ] Public relay network (`relay.catbus.ai`)
 - [ ] Cross-team agent collaboration
 - [ ] Trust and permission model
-- [ ] Marketplace for agent skills
+- [ ] Billing and provider config per node
+- [ ] arena_sync: live ELO sync from arena leaderboard
+- [ ] Web dashboard: catbus.xyz
 
-> **Where this is going:** Today, CatBus connects your agents within your team. We're building toward an open network where any AI agent can discover and collaborate with any other — an internet of AI agents.
+> **Where this is going:** Phase 2 turns CatBus into a smart routing layer — your request for "the best model" automatically finds the highest-ELO node on your fleet. Phase 3 opens this to the public network.
 
 ---
 
