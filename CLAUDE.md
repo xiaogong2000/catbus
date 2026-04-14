@@ -110,7 +110,38 @@ git push origin feature/<功能名称>
 
 ---
 
-## 七、紧急回滚
+## 七、发布流程
+
+### 1. feature → dev（功能合并）
+```bash
+git push origin feature/<功能名称>
+# 在 GitHub 创建 PR，目标分支：dev
+# Review 通过后合并，删除功能分支
+```
+
+### 2. dev 集成验证
+- 在 dev 分支上确认所有合并的功能正常运行
+- 发现问题则在新的 `fix/` 分支修复后再合回 dev
+
+### 3. dev → main（正式发布）
+```bash
+# 在 GitHub 创建 PR，从 dev 合并到 main
+# PR 标题带版本号：release: v2.1.0
+# 合并后打 tag：
+git tag v2.1.0
+git push origin v2.1.0
+```
+
+### 4. 部署生产
+- 各项目按自己的部署方式执行（Docker rebuild / pm2 restart / etc.）
+
+### 5. hotfix 特殊流程
+- 生产紧急问题：从 `main` 切出 `hotfix/xxx`
+- 修完后**同时合回 `main` 和 `dev`**，确保 dev 不丢失修复
+
+---
+
+## 八、紧急回滚
 
 ```bash
 # 优先使用 revert（安全，保留历史）
