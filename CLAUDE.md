@@ -83,6 +83,11 @@ git commit -m "merge: 同步 dev 最新代码并解决冲突"
 git push origin feature/<功能名称>
 ```
 
+### 冲突解决原则
+- 保留双方改动，不要简单选择一边丢弃另一边
+- 如果无法判断，保留对方代码并标注 `// TODO: 需确认` 让用户决定
+- **锁文件冲突**（`package-lock.json` / `yarn.lock`）：不要手动合并，接受对方版本后重新 `npm install` 生成
+
 ---
 
 ## 五、Pull Request 流程
@@ -101,6 +106,20 @@ git push origin feature/<功能名称>
 - 环境配置文件（`.env`, `config.yaml` 等）
 - 路由/权限相关文件
 - `package.json` / `requirements.txt` 等依赖文件
+
+### 环境变量与敏感文件
+- `.env` 文件永远不提交到 git
+- 新增环境变量时，更新 `.env.example`（只写变量名，不写真实值）
+- 密钥、token、密码禁止出现在代码或 commit 中
+
+### 多实例并行开发
+- 多个 Claude Code 实例同时开发时，分支名必须包含实例标识或任务ID，避免撞名
+- 示例：`feature/nefi-user-login`、`feature/claude2-payment-fix`
+- 开发前先 `git fetch origin && git branch -r` 确认没有同名分支
+
+### PR Review
+- PR 由用户（项目负责人）Review 后合并
+- 如果用户指定其他 Claude 实例 Review，reviewer 只提建议，最终合并权归用户
 
 ### 绝不执行的操作
 - `git push --force`（除非用户明确要求且解释了原因）
